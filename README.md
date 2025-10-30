@@ -1,4 +1,4 @@
-# 🚀 Fedora 42 Gaming & Performance Optimization Guide
+# 🚀 Fedora Linux 43 Performance & Gaming Optimization Guide
 
 > **Complete guide for optimizing Fedora 43 for maximum performance, gaming, general use, etc | by winterofhell**
 
