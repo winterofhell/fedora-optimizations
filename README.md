@@ -1,6 +1,6 @@
 # 🚀 Fedora 42 Gaming & Performance Optimization Guide
 
-> **Complete guide for optimizing Fedora 42 for gaming and maximum performance | by winterofhell**
+> **Complete guide for optimizing Fedora 43 for maximum performance, gaming, general use, etc | by winterofhell**
 
 ## 🧭 Quick Navigation
 
@@ -15,16 +15,16 @@
 
 **Testing Environment:**
 
-- **Period:** October 14, 2024 - September 07, 2025
-- **Distribution:** Fedora 42 (tested on Minimal ISO + Sway WM | Fedora Desktop GNOME Edition | KDE Edition)
+- **Period:** October 14, 2024 - October 31, 2025
+- **Distribution:** Fedora 42 / 43 Beta
 - **Additional Testing:** NVIDIA and AMD gpu systems
-- **This may also work on any other distro, but i cannot guarantee that all these tweaks will be good on other distro / your system. It is always necessary to test everything. Btw 80% of tweaks works on Arch and NixOS :)**
+- **These optimizations may also work on any other distro, but i cannot guarantee that all these tweaks will be good on other distro / your system. It is always necessary to test everything. Btw 80% of tweaks works on Arch and NixOS :)**
 
 **Hardware Configurations(tested on):**
 
-- **Primary:** Ryzen 5 5500U, 20GB DDR4, RX550X discrete/RX Vega 7 iGPU, NVMe disk
-- **Secondary:** Ryzen 5 5600, 16GB DDR4, GTX 1060, SATA SSD
-- **New one:** Ryzen 5 7500f, 32Gb DDR5, RX 9070 XT, Nvme M2.
+- **First:** Ryzen 5 5500U, 20GB DDR4, RX550X discrete/RX Vega 7 iGPU, NVMe disk
+- **Second:** Ryzen 5 5600, 16GB DDR4, GTX 1060, SATA SSD
+- **Third:** Ryzen 5 7500f, 32Gb DDR5, RX 9070 XT, Nvme M2
 
 -----
 
@@ -47,7 +47,7 @@ sudo dnf install https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfre
 
 ### 3. SELinux Configuration (Optional)
 
-⚠️ **Security Warning:** Disabling SELinux reduces system security but also makes ur system a little faster. Only proceed if you understand the implications. (Personally, I don't care about SELinux and i always disable it.)
+⚠️ **Security Warning:** Disabling SELinux reduces system security but also makes ur system a little faster. Only proceed if you understand the implications. (Personally, I don't care about SELinux and i always disable it)
 
 **Temporary disable (until reboot):**
 
@@ -132,7 +132,7 @@ sudo systemctl enable --now ananicy-cpp
 
 ### Leveraging Automated CachyOS Tweaks
 
-# The CachyOS team provides powerful packages that can automate many of the advanced tweaks for us. This is a simpler and safer approach than manually setting dozens of system variables.
+# The CachyOS team provides powerful packages that can automate many of the advanced tweaks. This is a simpler and safer approach than manually setting dozens of system variables :)
 
 # 1. Install CachyOS Optimization Packages
 sudo dnf install cachyos-settings cachyos-ksm-settings scx-scheds
@@ -182,7 +182,7 @@ sudo systemctl disable --now \
     upower.service
 ```
 
-💡 **Tip:** Only disable services you don’t need. Review each service before disabling to avoid breaking functionality you rely on.
+💡 **Tip:** Only disable services you don’t need. Review each service before disabling to avoid breaking functionality you rely on. Also you can search for services manually using internet/some apps
 
 -----
 
@@ -364,7 +364,7 @@ Create a simple maintenance script:
 #!/bin/bash
 # Save as ~/maintenance.sh and make executable
 
-echo "🧹 Running system maintenance..."
+echo "Running system maintenance..."
 
 # Update system
 sudo dnf upgrade --refresh
@@ -395,22 +395,9 @@ For maximum performance, consider these lightweight desktop environments (if ins
 - **XFCE** - Lightweight traditional desktop
 - **LXQt** - Qt-based lightweight desktop
 
-**KDE Plasma Edition (NEW in Fedora 42):**
-KDE Plasma is now an official Fedora edition alongside Workstation (GNOME). 
+**KDE Plasma Edition:**
+KDE Plasma is now an official Fedora (added in Fedora 42) edition alongside Workstation (GNOME). 
 This means better integration, support, and optimization out of the box.
-
-### Fedora 42 Specific Enhancements
-
-**What's New for Performance:**
-- Updated Mesa drivers for better AMD/Intel graphics
-- Improved Wayland compositor performance
-- Better power management defaults
-- Enhanced container support
-
-**Fedora 42 Gaming Improvements:**
-- Better Steam Deck compatibility mode
-- Enhanced Proton integration
-- Improved HDR support preparation
 
 ### Laptop Power Management
 
@@ -445,7 +432,7 @@ echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
 
 **Steam Flatpak Optimization:**
 ```bash
-# Install Steam as Flatpak for better sandboxing
+# Install Steam as Flatpak for sandboxing
 flatpak install com.valvesoftware.Steam
 
 # Grant necessary permissions for gaming
@@ -461,7 +448,7 @@ If staying with GNOME:
 # Install GNOME tweaks
 sudo dnf install gnome-tweaks gnome-extensions-app
 
-# Disable animations for better performance
+# You can disable animations for better performance
 gsettings set org.gnome.desktop.interface enable-animations false
 
 # Reduce resource usage
@@ -548,9 +535,9 @@ echo "3" | sudo tee /sys/class/drm/card*/device/pp_dpm_mclk
 <details>
 <summary>🟢 NVIDIA Graphics Optimization</summary>
 
-## 🎮 NVIDIA Graphics Optimization for Fedora 42 (Wayland)
+## 🎮 NVIDIA Graphics Optimization for Fedora
 
-> **Comprehensive optimization guide for NVIDIA GPUs on Fedora 42 with Wayland display server**
+> **Comprehensive optimization guide for NVIDIA GPUs on Fedora with Wayland display server**
 
 ### 📋 NVIDIA System Requirements
 
@@ -558,21 +545,19 @@ echo "3" | sudo tee /sys/class/drm/card*/device/pp_dpm_mclk
 
 - GTX 700/900/1000 series and newer (Maxwell, Pascal, Turing, Ampere, Ada Lovelace, Blackwell)
 - RTX 20/30/40/50 series with full feature support
-- Quadro and Tesla cards (professional workloads)
 
 **Driver Compatibility:**
 
-- **Recommended:** NVIDIA 580+ drivers for optimal Wayland support
-- **Minimum:** NVIDIA 570+ for stable Wayland functionality
+- **Best:** NVIDIA 580+ drivers for optimal Wayland support and performance
 - **Note:** NVIDIA driver stack seeing much better Wayland support with its latest drivers
 
 -----
 
-### 🔧 NVIDIA Driver Installation (Fedora 42 Wayland)
+### 🔧 NVIDIA Driver Installation
 
 #### Method 1: RPM Fusion (Strongly Recommended)
 
-RPM Fusion remains the most reliable method for NVIDIA drivers on Fedora 42. This approach ensures proper integration with the Wayland display server and system updates.
+RPM Fusion remains the most reliable method for NVIDIA drivers on Fedora. This approach ensures proper integration with the Wayland display server and system updates.
 
 ```bash
 # Enable RPM Fusion repositories (if not already enabled)
@@ -696,17 +681,25 @@ __GL_ALLOW_UNOFFICIAL_PROTOCOL=1
 PROTON_ENABLE_NVAPI=1
 NVIDIA_DRIVER_CAPABILITIES=all
 
+# Good flags for every game on Steam/PortProton/Lutris etc found on reddit and used by community
+PROTON_ENABLE_WAYLAND=1
+LD_PRELOAD=""
+__GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
+%command%
+-fullscreen;
+
 # The following tweaks are not recommended globally. Use them only if you know you need them.
 
 # For wl-roots compositors ONLY (Sway, Hyprland)
-# These may help with graphical glitches but are not needed on GNOME/KDE.
+# These may help with graphical glitches but are not needed and recommended on GNOME/KDE.
 WLR_DRM_NO_ATOMIC=1
 WLR_NO_HARDWARE_CURSORS=1
 ```
 
 #### 2. Kernel Module Parameters
 
-Modern NVIDIA drivers benefit from specific kernel parameters that improve Wayland compatibility and performance.
+Modern NVIDIA drivers benefit from specific kernel parameters that can improve performance
+Test each option if it works in ur case and with you hardware
 
 Create `/etc/modprobe.d/nvidia-power-management.conf`:
 
@@ -781,13 +774,13 @@ gamemoderun __GL_SYNC_TO_VBLANK=0 __GL_THREADED_OPTIMIZATIONS=1 %command%
 
 ```bash
 # Standard Proton optimization
-gamemoderun __GL_THREADED_OPTIMIZATIONS=1 PROTON_ENABLE_NVAPI=1 %command%
+gamemoderun __GL_THREADED_OPTIMIZATIONS=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
 
 # Advanced optimization with DXVK async compilation
-gamemoderun __GL_THREADED_OPTIMIZATIONS=1 DXVK_ASYNC=1 PROTON_ENABLE_NVAPI=1 %command%
+gamemoderun __GL_THREADED_OPTIMIZATIONS=1 DXVK_ASYNC=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
 
 # For games requiring maximum performance
-gamemoderun __GL_SYNC_TO_VBLANK=0 __GL_THREADED_OPTIMIZATIONS=1 DXVK_ASYNC=1 PROTON_ENABLE_NVAPI=1 %command%
+gamemoderun __GL_SYNC_TO_VBLANK=0 __GL_THREADED_OPTIMIZATIONS=1 DXVK_ASYNC=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
 ```
 
 #### 2. Lutris Gaming Optimization
@@ -803,7 +796,7 @@ sudo dnf install lutris wine
 __GL_THREADED_OPTIMIZATIONS=1
 __GL_SHADER_DISK_CACHE=1
 PROTON_ENABLE_NVAPI=1
-DXVK_HUD=fps,memory,gpuload
+__GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
 ```
 
 #### 3. GameMode Integration
@@ -855,7 +848,7 @@ High Dynamic Range support is gradually improving on Wayland with NVIDIA drivers
 # Enable HDR support (requires compatible display and recent drivers)
 echo 'options nvidia NVreg_EnableHDR=1' | sudo tee /etc/modprobe.d/nvidia-hdr.conf
 
-# GNOME HDR support (experimental, GNOME 46+)
+# GNOME HDR support (experimental!)
 gsettings set org.gnome.mutter experimental-features "['variable-refresh-rate','hdr']"
 ```
 
@@ -1144,7 +1137,6 @@ EOF
 
 **Fedora-Specific Resources:**
 - [RPM Fusion NVIDIA Guide](https://rpmfusion.org/Howto/NVIDIA)
-- [Fedora 42 Release Notes](https://fedoraproject.org/wiki/Releases/42/ChangeSet)
 
 **Wayland and Gaming:**
 - [Gaming on Linux with NVIDIA](https://www.gamingonlinux.com/)
@@ -1221,10 +1213,10 @@ sudo rpm -Va
 
 Based on testing, users can expect:
 
-- **Boot Time:** 15-30% improvement
+- **Boot Time:** 10-20% improvement
 - **Gaming Performance:** 5-15% FPS increase
 - **System Responsiveness:** Significantly reduced input lag
-- **Memory Usage:** 10-20% reduction in idle RAM usage
+- **Memory Usage:** 5-15% reduction in idle RAM usage
 - **Storage Performance:** Improved SSD performance with trim
 
 -----
@@ -1234,7 +1226,9 @@ Based on testing, users can expect:
 <details>
 <summary>👀 Нажмите для просмотра русской версии</summary>
     
-# 🚀 Руководство по оптимизации Fedora 42 для игр и производительности
+# 🚀 Руководство по оптимизации Fedora для игр и производительности
+
+# ОБНОВЛЯЕТСЯ С ЗАДЕРЖКОЙ, если хотите видеть самые последние и свежие изменения в этом гайде, то читайте английскую версию
 
 ## 🧭 Быстрая навигация
 
@@ -2509,7 +2503,8 @@ This guide modifies system settings that may affect stability and security. Alwa
 - **v1.4** - Added AMD gpu tweaks section, corrected some text and updated full Russian translation
 - **v1.5** - Added a Quick Navigation section for better usability
 - **v1.6** - Changed from UKSMD to KSMD, more deeper cachyos kernel settings, etc
+- **v1.7** - Updated with more nvidia flags, corrections, preparing for Fedora 43 release
 
 -----
 
-*Last updated: September 2025*
+*Last updated: November 2025*
