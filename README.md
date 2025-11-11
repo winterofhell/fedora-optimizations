@@ -1,8 +1,8 @@
-# 🚀 Fedora Linux 43 Performance & Gaming Optimization Guide
+# Fedora Linux 43 Performance & Gaming Optimization Guide
 
 > **Complete guide for optimizing Fedora 43 for maximum performance, gaming, general use, etc | by winterofhell**
 
-## 🧭 Quick Navigation
+## Quick Navigation
 
 | Setup & Kernel                                                              | System & Gaming                                                            | Resources                                                                 |
 | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -11,24 +11,24 @@
 | [**Kernel Optimization**](#-kernel-optimization)                            | [**Maintenance & Cleanup**](#-maintenance--cleanup)                        | [**Russian Translation**](#-русская-версия--russian-translation)     |
 | [**GRUB Kernel Parameters**](#️-grub-kernel-parameters)                       | [**Graphics Driver Optimization**](#️-graphics-driver-optimization)          |                                                                           |
 
-## 📋 System Information
+## System Information
 
 **Testing Environment:**
 
-- **Period:** October 14, 2024 - October 31, 2025
+- **Period:** October 14, 2024 - November 11, 2025
 - **Distribution:** Fedora 42 / 43 Beta
 - **Additional Testing:** NVIDIA and AMD gpu systems
 - **These optimizations may also work on any other distro, but i cannot guarantee that all these tweaks will be good on other distro / your system. It is always necessary to test everything. Btw 80% of tweaks works on Arch and NixOS :)**
 
 **Hardware Configurations(tested on):**
 
-- **First:** Ryzen 5 5500U, 20GB DDR4, RX550X discrete/RX Vega 7 iGPU, NVMe disk
+- **First:** Ryzen 5 5500U, 20GB DDR4, RX550X discrete/RX Vega 7 iGPU, NVMe
 - **Second:** Ryzen 5 5600, 16GB DDR4, GTX 1060, SATA SSD
-- **Third:** Ryzen 5 7500f, 32Gb DDR5, RX 9070 XT, Nvme M2
+- **Third:** Ryzen 5 7500f, 32Gb DDR5, RX 9070 XT, Nvme
 
 -----
 
-## 🛠 Initial Setup & Preparation
+## Initial Setup & Preparation
 
 ### 1. Minimal Installation
 
@@ -43,11 +43,11 @@ sudo dnf install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-rele
 sudo dnf install https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
 ```
 
-📖 **Official Guide:** [RPM Fusion Configuration](https://rpmfusion.org/Configuration)
+**Official Guide:** [RPM Fusion Configuration](https://rpmfusion.org/Configuration)
 
 ### 3. SELinux Configuration (Optional)
 
-⚠️ **Security Warning:** Disabling SELinux reduces system security but also makes ur system a little faster. Only proceed if you understand the implications. (Personally, I don't care about SELinux and i always disable it)
+**Security Warning:** Disabling SELinux reduces system security but also makes ur system a little faster. Only proceed if you understand the implications. (Personally, I don't care about SELinux and i always disable it)
 
 **Temporary disable (until reboot):**
 
@@ -104,7 +104,7 @@ sudo dnf install kernel-cachyos kernel-cachyos-devel
 sudo dnf install kernel-cachyos-lts kernel-cachyos-lts-devel-matched
 ```
 
-📖 **More Info:** [CachyOS Kernel Installation](https://copr.fedorainfracloud.org/coprs/bieszczaders/kernel-cachyos/)
+**More Info:** [CachyOS Kernel Installation](https://copr.fedorainfracloud.org/coprs/bieszczaders/kernel-cachyos/)
 
 -----
 
@@ -144,7 +144,7 @@ sudo dnf install cachyos-settings cachyos-ksm-settings scx-scheds
 # Step 1: Configure the Default Scheduler
 # We will set `bpfland` as our default scheduler, as it provides an excellent balance for gaming and desktop usage. Create the configuration file with this command:
 
-cat <<EOF | sudo tee /etc/scx_loader/config.toml
+sudo nano /etc/scx_loader/config.toml
 # Set the bpfland scheduler as default and configure it for gaming mode.
 default_sched = "scx_bpfland"
 default_mode = "Gaming"
@@ -154,7 +154,7 @@ auto_mode = []
 gaming_mode = ["-m", "performance"]
 lowlatency_mode = ["-s", "5000", "-S", "500", "-l", "5000", "-m", "performance"]
 powersave_mode = ["-m", "powersave"]
-EOF
+
 
 # Step 2: Enable and Start the Scheduler Service
 sudo systemctl enable --now scx_loader
@@ -182,7 +182,7 @@ sudo systemctl disable --now \
     upower.service
 ```
 
-💡 **Tip:** Only disable services you don’t need. Review each service before disabling to avoid breaking functionality you rely on. Also you can search for services manually using internet/some apps
+**Tip:** Only disable services you don’t need. Review each service before disabling to avoid breaking functionality you rely on. Also you can search for services manually using internet/some apps
 
 -----
 
@@ -199,7 +199,7 @@ sudo nano /etc/default/grub
 Add these parameters to `GRUB_CMDLINE_LINUX`:
 
 ```bash
-GRUB_CMDLINE_LINUX="quiet lpj=XXXXXXX mitigations=off skew_tick=1 elevator=mq-deadline nowatchdog page_alloc.shuffle=1 pci=pcie_bus_perf intel_idle.max_cstate=1 processor.max_cstate=1 libahci.ignore_sss=1 noautogroup amd_pstate=active"
+GRUB_CMDLINE_LINUX="quiet lpj=XXXXXXX mitigations=off skew_tick=1 nowatchdog page_alloc.shuffle=1 pci=pcie_bus_perf intel_idle.max_cstate=1 processor.max_cstate=1 libahci.ignore_sss=1 noautogroup amd_pstate=active"
 ```
 
 **Get the LPJ value:**
@@ -218,14 +218,13 @@ sudo grub2-mkconfig -o /boot/grub2/grub.cfg
 **Parameter Explanations:**
 
 - `mitigations=off` - Disables CPU vulnerability mitigations for better performance
-- `elevator=mq-deadline` - Uses deadline I/O scheduler (better for ssds than noop)
 - `nowatchdog` - Disables hardware watchdog
 - `intel_idle.max_cstate=1` - Limits CPU idle states for lower latency (intel only)
 - `amd_pstate=active` - Enables AMD P-State driver for better power management
 
 -----
 
-## 🎯 Advanced System Tweaks
+## Advanced System Tweaks
 
 ### Memory Management
 
@@ -294,9 +293,39 @@ sudo systemctl status irqbalance
 sudo systemctl disable --now irqbalance
 ```
 
+### I/O Scheduler Configuration
+
+Modern Linux systems use udev rules to configure I/O schedulers per device type. The `elevator=` kernel parameter is deprecated and no longer works on newer kernel versions
+
+**Create udev rule for optimal I/O scheduling:**
+```bash
+sudo tee /etc/udev/rules.d/60-ioschedulers.rules
+# HDD (rotational drives) - use mq-deadline for better performance
+ACTION=="add|change", KERNEL=="sd[a-z]*", ATTR{queue/rotational}=="1", ATTR{queue/scheduler}="mq-deadline"
+
+# SSD (non-rotational drives) - use mq-deadline
+ACTION=="add|change", KERNEL=="sd[a-z]*|mmcblk[0-9]*", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="mq-deadline"
+
+# NVMe SSD - use 'none' for best performance
+# NVMe drives have their own advanced queue management and don't benefit from additional scheduling
+ACTION=="add|change", KERNEL=="nvme[0-9]*", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="none"
+
+thanks to netarchy for mentioning this new method!
+```
+
+**Apply the changes immediately:**
+```bash
+# Reload udev rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+# Verify your current I/O schedulers
+cat /sys/block/*/queue/scheduler
+```
+
 -----
 
-## 🎮 Gaming Optimizations
+## Gaming Optimizations
 
 ### GameMode Installation
 
@@ -336,7 +365,7 @@ gamemoderun DXVK_ASYNC=1 %command%
 
 -----
 
-## 🧹 Maintenance & Cleanup
+## Maintenance & Cleanup
 
 ### Package Cache Management
 
@@ -378,12 +407,12 @@ sudo journalctl --vacuum-time=7d
 # Run TRIM on SSD
 sudo fstrim -v /
 
-echo "✅ Maintenance complete!"
+echo "Maintenance complete!"
 ```
 
 -----
 
-## 🖥️ Desktop Environment Recommendations
+## Desktop Environment Recommendations
 
 ### Lightweight Alternatives
 
@@ -476,7 +505,7 @@ sudo dnf install rocm-opencl rocm-smi
 
 ```bash
 # Create AMD GPU optimization config
-cat << 'EOF' | sudo tee /etc/environment.d/99-amd-gaming.conf
+sudo nano /etc/environment.d/99-amd-gaming.conf
 # Enable GPU Threading
 mesa_glthread=true
 
@@ -490,7 +519,6 @@ LIBVA_DRIVER_NAME=radeonsi
 
 # Enable Resizable BAR
 AMD_GPU_ALLOW_RESIZE_BAR=1
-EOF
 ```
 
 ### AMD GPU Power Management
@@ -501,7 +529,7 @@ echo "performance" | sudo tee /sys/class/drm/card*/device/power_dpm_state
 echo "high" | sudo tee /sys/class/drm/card*/device/power_profile
 
 # Create persistent service
-cat << 'EOF' | sudo tee /etc/systemd/system/amd-gpu-performance.service
+sudo nano /etc/systemd/system/amd-gpu-performance.service
 [Unit]
 Description=AMD GPU Performance Mode
 After=multi-user.target
@@ -514,7 +542,6 @@ RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
-EOF
 
 sudo systemctl enable --now amd-gpu-performance.service
 ```
@@ -535,11 +562,11 @@ echo "3" | sudo tee /sys/class/drm/card*/device/pp_dpm_mclk
 <details>
 <summary>🟢 NVIDIA Graphics Optimization</summary>
 
-## 🎮 NVIDIA Graphics Optimization for Fedora
+## NVIDIA Graphics Optimization for Fedora
 
 > **Comprehensive optimization guide for NVIDIA GPUs on Fedora with Wayland display server**
 
-### 📋 NVIDIA System Requirements
+### NVIDIA System Requirements
 
 **Supported GPUs:**
 
@@ -553,7 +580,7 @@ echo "3" | sudo tee /sys/class/drm/card*/device/pp_dpm_mclk
 
 -----
 
-### 🔧 NVIDIA Driver Installation
+### NVIDIA Driver Installation
 
 #### Method 1: RPM Fusion (Strongly Recommended)
 
@@ -633,7 +660,7 @@ Add to `/etc/environment`:
 ```bash
 # Core NVIDIA Wayland optimizations
 #
-#⚠️ Critical Warning for Modern NVIDIA GPUs (RTX 20-Series and Newer)
+# Critical Warning for Modern NVIDIA GPUs (RTX 20-Series and Newer)
 #
 # Based on user feedback and testing, the following two env variables (`GBM_BACKEND` and `__GLX_VENDOR_LIBRARY_NAME`) can cause severe system-wide input lag, stuttering, and application unresponsiveness on NVIDIA RTX 20, 30, 40, and 50 series of gpus
 #
@@ -754,7 +781,7 @@ qdbus org.kde.KWin /KWin reconfigure
 
 -----
 
-### 🏎️ Gaming-Specific NVIDIA Optimizations
+### Gaming-Specific NVIDIA Optimizations
 
 #### 1. Steam Launch Options for Wayland
 
@@ -808,7 +835,7 @@ GameMode automatically applies system optimizations during gaming. While it work
 sudo dnf install gamemode
 
 # Configure GameMode for NVIDIA optimization
-sudo tee /etc/gamemode.ini << 'EOF'
+sudo nano /etc/gamemode.ini
 [general]
 renice=10
 ioprio=1
@@ -816,12 +843,11 @@ ioprio=1
 [gpu]
 apply_gpu_optimisations=accept-responsibility
 gpu_device=0
-EOF
 ```
 
 -----
 
-### 🔥 Advanced NVIDIA Wayland Tweaks
+### Advanced NVIDIA Wayland Tweaks
 
 #### 1. Variable Refresh Rate (VRR) Support
 
@@ -861,21 +887,20 @@ Effective performance monitoring helps identify bottlenecks and verify that opti
 sudo dnf install nvtop mangohud goverlay
 
 # Create monitoring script for gaming sessions
-sudo tee /usr/local/bin/nvidia-gaming-monitor.sh << 'EOF'
+sudo nano /usr/local/bin/nvidia-gaming-monitor.sh
 #!/bin/bash
-echo "=== NVIDIA Gaming Performance Monitor ==="
+echo "=== NVIDIA Performance Monitor ==="
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
 echo "Driver: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader)"
 echo "=== Real-time Stats ==="
 nvidia-smi dmon -s pucvmet
-EOF
 
 sudo chmod +x /usr/local/bin/nvidia-gaming-monitor.sh
 ```
 
 -----
 
-### 🛡️ Power Management and Thermal Optimization
+### Power Management and Thermal Optimization
 
 #### 1. Advanced Power Management
 
@@ -886,11 +911,10 @@ Proper power management ensures consistent performance while preventing unnecess
 echo 'options nvidia NVreg_DynamicPowerManagement=0x02' | sudo tee -a /etc/modprobe.d/nvidia-power.conf
 
 # Enable runtime power management for laptops
-sudo tee /etc/udev/rules.d/80-nvidia-pm.rules << 'EOF'
+sudo nano /etc/udev/rules.d/80-nvidia-pm.rules
 # Enable runtime PM for NVIDIA VGA/3D controller devices
 SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", TEST=="power/control", ATTR{power/control}="auto"
 SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", TEST=="power/control", ATTR{power/control}="auto"
-EOF
 ```
 
 #### 2. Thermal Management
@@ -905,7 +929,7 @@ sudo dnf install lm_sensors
 sudo sensors-detect --auto
 
 # Create thermal monitoring script
-sudo tee /usr/local/bin/nvidia-thermal.sh << 'EOF'
+sudo nano /usr/local/bin/nvidia-thermal.sh
 #!/bin/bash
 TEMP=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits)
 POWER=$(nvidia-smi --query-gpu=power.draw --format=csv,noheader,nounits)
@@ -918,14 +942,14 @@ if [ $TEMP -gt 83 ]; then
     echo "WARNING: GPU temperature is high!"
     notify-send "GPU Temperature Warning" "GPU is running at ${TEMP}°C"
 fi
-EOF
+
 
 sudo chmod +x /usr/local/bin/nvidia-thermal.sh
 ```
 
 -----
 
-### 🐛 NVIDIA Wayland Troubleshooting
+### NVIDIA Wayland Troubleshooting
 
 #### Common Issues and Modern Solutions
 
@@ -1014,7 +1038,7 @@ nvidia-smi --query-gpu=power.draw --format=csv --loop=1
 
 -----
 
-### 🔧 NVIDIA Developer and AI Tools
+### NVIDIA Developer and AI Tools
 
 #### CUDA Development Environment
 
@@ -1058,7 +1082,7 @@ sudo docker run --rm --gpus all nvidia/cuda:12.7-runtime-ubuntu25.04 nvidia-smi
 
 -----
 
-### 📊 Performance Monitoring and Benchmarking
+### Performance Monitoring and Benchmarking
 
 #### Comprehensive Monitoring Setup
 
@@ -1069,7 +1093,7 @@ Effective monitoring helps optimize performance and identify potential issues be
 sudo dnf install nvtop btop mangohud goverlay
 
 # Create performance monitoring script
-sudo tee /usr/local/bin/nvidia-perf-monitor.sh << 'EOF'
+sudo nano /usr/local/bin/nvidia-perf-monitor.sh
 #!/bin/bash
 clear
 echo "=== NVIDIA Performance Monitor ==="
@@ -1088,7 +1112,7 @@ nvidia-smi pmon -c 1
 echo ""
 echo "Press Ctrl+C to exit continuous monitoring..."
 watch -n 2 nvidia-smi
-EOF
+
 
 sudo chmod +x /usr/local/bin/nvidia-perf-monitor.sh
 ```
@@ -1101,7 +1125,7 @@ MangoHud provides real-time performance metrics during gaming sessions.
 # Configure MangoHud for optimal display
 mkdir -p ~/.config/MangoHud
 
-cat > ~/.config/MangoHud/MangoHud.conf << 'EOF'
+nano > ~/.config/MangoHud/MangoHud.conf
 # GPU and CPU information
 gpu_stats
 cpu_stats
@@ -1124,12 +1148,11 @@ alpha=0.8
 
 # Limit logging to prevent performance impact
 log_duration=60
-EOF
 ```
 
 -----
 
-### 📚 Additional Resources
+### Additional Resources
 
 **Official NVIDIA Documentation:**
 - [NVIDIA Linux Driver Installation Guide](https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/index.html)
@@ -1148,7 +1171,7 @@ EOF
 
 -----
 
-## 🔍 Monitoring & Verification
+## Monitoring & Verification
 
 ### Performance Monitoring Tools
 
@@ -1172,7 +1195,7 @@ sudo dnf install sysbench stress-ng
 
 -----
 
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -1209,7 +1232,7 @@ sudo rpm -Va
 
 -----
 
-## 📊 Expected Performance Gains
+## Expected Performance Gains
 
 Based on testing, users can expect:
 
@@ -2461,7 +2484,7 @@ sudo rpm -Va
 
 -----
 
-## 🤝 Contributing
+## Contributing
 
 Found improvements or have suggestions? Feel free to:
 
@@ -2471,7 +2494,7 @@ Found improvements or have suggestions? Feel free to:
 
 -----
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [Fedora Documentation](https://docs.fedoraproject.org/)
 - [RPM Fusion](https://rpmfusion.org/)
@@ -2481,7 +2504,7 @@ Found improvements or have suggestions? Feel free to:
 
 -----
 
-## ⚖️ Disclaimer
+## Disclaimer
 
 This guide modifies system settings that may affect stability and security. Always:
 
