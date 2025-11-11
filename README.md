@@ -6,10 +6,10 @@
 
 | Setup & Kernel                                                              | System & Gaming                                                            | Resources                                                                 |
 | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| [**System Information**](#-system-information)                              | [**Advanced System Tweaks**](#-advanced-system-tweaks)                     | [**Monitoring & Verification**](#-monitoring--verification)               |
-| [**Initial Setup & Preparation**](#-initial-setup--preparation)             | [**Gaming Optimizations**](#-gaming-optimizations)                         | [**Troubleshooting**](#-troubleshooting)                                  |
-| [**Kernel Optimization**](#-kernel-optimization)                            | [**Maintenance & Cleanup**](#-maintenance--cleanup)                        | [**Russian Translation**](#-русская-версия--russian-translation)     |
-| [**GRUB Kernel Parameters**](#️-grub-kernel-parameters)                       | [**Graphics Driver Optimization**](#️-graphics-driver-optimization)          |                                                                           |
+| [**System Information**](#system-information)                              | [**Advanced System Tweaks**](#advanced-system-tweaks)                     | [**Monitoring & Verification**](#monitoring--verification)               |
+| [**Initial Setup & Preparation**](#initial-setup--preparation)             | [**Gaming Optimizations**](#gaming-optimizations)                         | [**Troubleshooting**](#troubleshooting)                                  |
+| [**Kernel Optimization**](#kernel-optimization)                            | [**Maintenance & Cleanup**](#maintenance--cleanup)                        | [**Russian Translation**](#русская-версия--russian-translation)     |
+| [**GRUB Kernel Parameters**](#grub-kernel-parameters)                       | [**Graphics Driver Optimization**](#graphics-driver-optimization)          |                                                                           |
 
 ## System Information
 
@@ -75,7 +75,7 @@ sudo dnf install linux-firmware intel-ucode amd-ucode
 
 -----
 
-## ⚡ Kernel Optimization
+## Kernel Optimization
 
 ### CachyOS Kernel Installation
 
@@ -108,7 +108,7 @@ sudo dnf install kernel-cachyos-lts kernel-cachyos-lts-devel-matched
 
 -----
 
-## 🔧 System Services Optimization
+## System Services Optimization
 
 ### Ananicy-cpp Installation
 
@@ -186,7 +186,7 @@ sudo systemctl disable --now \
 
 -----
 
-## ⚙️ GRUB Kernel Parameters
+## GRUB Kernel Parameters
 
 ### Configuration
 
@@ -486,7 +486,7 @@ gsettings set org.gnome.shell.overrides workspaces-only-on-primary false
 
 -----
 
-## 🖥️ Graphics Driver Optimization
+## Graphics Driver Optimization
 
 <details>
 <summary>🔴 AMD Graphics Optimization</summary>
@@ -1244,7 +1244,7 @@ Based on testing, users can expect:
 
 -----
 
-## 🌍 Русская версия | (Russian Translation)
+## Русская версия | (Russian Translation)
 
 <details>
 <summary>👀 Нажмите для просмотра русской версии</summary>
