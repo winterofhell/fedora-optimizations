@@ -15,8 +15,8 @@
 
 **Testing Environment:**
 
-- **Period:** October 14, 2024 - November 11, 2025
-- **Distribution:** Fedora 42 / 43 Beta
+- **Period:** October 14, 2024 - November 29, 2025
+- **Distribution:** Fedora 43
 - **Additional Testing:** NVIDIA and AMD gpu systems
 - **These optimizations may also work on any other distro, but i cannot guarantee that all these tweaks will be good on other distro / your system. It is always necessary to test everything. Btw 80% of tweaks works on Arch and NixOS :)**
 
@@ -425,7 +425,7 @@ For maximum performance, consider these lightweight desktop environments (if ins
 - **LXQt** - Qt-based lightweight desktop
 
 **KDE Plasma Edition:**
-KDE Plasma is now an official Fedora (added in Fedora 42) edition alongside Workstation (GNOME). 
+KDE Plasma is now an official Fedora edition alongside Workstation (GNOME). 
 This means better integration, support, and optimization out of the box.
 
 ### Laptop Power Management
@@ -622,7 +622,7 @@ nvidia-smi -q | grep "CUDA Version"
 
 # Verify Wayland is using NVIDIA GPU
 echo $XDG_SESSION_TYPE
-# Should output "wayland" on Fedora 42
+# Should output "wayland"
 
 # Check that GBM backend is working
 nvidia-smi --query-gpu=name,driver_version --format=csv
