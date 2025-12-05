@@ -117,7 +117,7 @@ Ananicy-cpp automatically manages process priorities and reduces system latency:
 ```bash
 # Install build dependencies
 sudo dnf groupinstall "Development Tools"
-sudo dnf install cmake systemd-devel spdlog-devel fmt-devel nlohmann-json-devel
+sudo dnf install cmake systemd-devel spdlog-devel fmt-devel nlohmann-json-devel make automake gcc gcc-c++
 
 # Clone and build
 git clone https://gitlab.com/ananicy-cpp/ananicy-cpp.git
@@ -1386,7 +1386,7 @@ Ananicy-cpp автоматически управляет приоритетам
 ```bash
 # Установить зависимости для сборки
 sudo dnf groupinstall "Development Tools"
-sudo dnf install cmake systemd-devel spdlog-devel fmt-devel nlohmann-json-devel
+sudo dnf install cmake systemd-devel spdlog-devel fmt-devel nlohmann-json-devel make automake gcc gcc-c++
 
 # Клонировать и собрать
 git clone https://gitlab.com/ananicy-cpp/ananicy-cpp.git
