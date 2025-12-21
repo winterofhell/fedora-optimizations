@@ -15,12 +15,12 @@
 
 **Testing Environment:**
 
-- **Period:** October 14, 2024 - November 29, 2025
+- **Period:** October 14, 2024 - December 21, 2025
 - **Distribution:** Fedora 43
 - **Additional Testing:** NVIDIA and AMD gpu systems
-- **These optimizations may also work on any other distro, but i cannot guarantee that all these tweaks will be good on other distro / your system. It is always necessary to test everything. Btw 80% of tweaks works on Arch and NixOS :)**
+- **These optimizations may also work on any other distro, but i cannot guarantee that all these tweaks will be good on other distro / your system. It is always necessary to test everything. 80% of tweaks work on Arch and NixOS :)**
 
-**Hardware Configurations(tested on):**
+**Hardware Configurations (tested on):**
 
 - **First:** Ryzen 5 5500U, 20GB DDR4, RX550X discrete/RX Vega 7 iGPU, NVMe
 - **Second:** Ryzen 5 5600, 16GB DDR4, GTX 1060, SATA SSD
@@ -32,7 +32,7 @@
 
 ### 1. Minimal Installation
 
-For optimal performance, always start with the **Fedora Minimal ISO**. This approach eliminates unnecessary packages and services that can impact system resources. Btw it is not necessary to do this.
+For optimal performance, always start with the **Fedora Minimal ISO**. This approach eliminates unnecessary packages and services that can impact system resources. But it is not necessary to do this.
 
 ### 2. Enable RPM Fusion Repositories
 
@@ -84,8 +84,8 @@ The CachyOS kernel provides significant performance improvements for gaming and 
 **Prerequisites:** CPU must support x86_64_v3 instruction set !!
 
 ```bash
-# Checking for the cpu support
-# Check support by the following the command
+# Checking for cpu support
+# Check support by running the following command
 
 /lib64/ld-linux-x86-64.so.2 --help | grep "(supported, searched)"
 
@@ -575,8 +575,8 @@ echo "3" | sudo tee /sys/class/drm/card*/device/pp_dpm_mclk
 
 **Driver Compatibility:**
 
-- **Best:** NVIDIA 580+ drivers for optimal Wayland support and performance
-- **Note:** NVIDIA driver stack seeing much better Wayland support with its latest drivers
+- **Best:** NVIDIA 590+ drivers for optimal Wayland support and performance
+- **Note:** NVIDIA driver stack is seeing much better Wayland support with its latest drivers
 
 -----
 
@@ -662,7 +662,7 @@ Add to `/etc/environment`:
 #
 # Critical Warning for Modern NVIDIA GPUs (RTX 20-Series and Newer)
 #
-# Based on user feedback and testing, the following two env variables (`GBM_BACKEND` and `__GLX_VENDOR_LIBRARY_NAME`) can cause severe system-wide input lag, stuttering, and application unresponsiveness on NVIDIA RTX 20, 30, 40, and 50 series of gpus
+# Based on user feedback and testing, the following two env variables (`GBM_BACKEND` and `__GLX_VENDOR_LIBRARY_NAME`) can cause severe system-wide input lag, stuttering, and application unresponsiveness on NVIDIA RTX 20, 30, 40, and 50 series gpus
 #
 # ! Recommendation for RTX 20-series and newer: DO NOT use these variables. Modern nvidia drivers and wayland compositors generally handle this configuration automatically. Enabling them manually can create conflicts
 # ! Recommendation for older gpus (GTX 10-Series and older): These variables can still be beneficial for ensuring wayland compatibility on older hardware. you can try them. any issue report with a specific gpu problems will be very valuable! :)
@@ -676,7 +676,7 @@ __GLX_VENDOR_LIBRARY_NAME=nvidia
 __GL_THREADED_OPTIMIZATIONS=1
 # Warning: __GL_THREADED_OPTIMIZATIONS option can cause black screens on some RTX cards (See NVIDIA Wayland Troubleshooting)
 # Set this per-game instead (see troubleshooting section)
-# Or test and set it for environment, if you will have a black screen - log in throught tty, remove __GL_THREADED_OPTIMIZATION=1 from /etc/environment, save and reboot.
+# Or test and set it for environment, if you encounter a black screen - log in through tty, remove __GL_THREADED_OPTIMIZATION=1 from /etc/environment, save and reboot.
 # short tty guide
 #    - press Ctrl+Alt+F3 (or F2–F6) to switch to a TTY login screen.
 #    - log in with your username and password.
@@ -2530,4 +2530,4 @@ This guide modifies system settings that may affect stability and security. Alwa
 
 -----
 
-*Last updated: November 2025*
+*Last updated: December 2025*
