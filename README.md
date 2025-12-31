@@ -15,14 +15,14 @@
 
 **Testing Environment:**
 
-- **Period:** October 14, 2024 - December 21, 2025
+- **Period:** October 14, 2024 - December 31, 2025
 - **Distribution:** Fedora 43
 - **Additional Testing:** NVIDIA and AMD gpu systems
-- **These optimizations may also work on any other distro, but i cannot guarantee that all these tweaks will be good on other distro / your system. It is always necessary to test everything. 80% of tweaks work on Arch and NixOS :)**
+- **These optimizations may also work on any other distro, but i cannot guarantee it. It is always necessary to test everything. About 90% of these tweaks work on Arch and NixOS :)**
 
 **Hardware Configurations (tested on):**
 
-- **First:** Ryzen 5 5500U, 20GB DDR4, RX550X discrete/RX Vega 7 iGPU, NVMe
+- **First:** Ryzen 5 5500U, 20GB DDR4, RX550X/RX Vega 7, NVMe
 - **Second:** Ryzen 5 5600, 16GB DDR4, GTX 1060, SATA SSD
 - **Third:** Ryzen 5 7500f, 32Gb DDR5, RX 9070 XT, Nvme
 
@@ -142,19 +142,23 @@ sudo dnf install cachyos-settings cachyos-ksm-settings scx-scheds
 # Note: This is an advanced tweak. While it provides significant gains, it changes a core component of the system !!
 
 # Step 1: Configure the Default Scheduler
-# We will set `bpfland` as our default scheduler, as it provides an excellent balance for gaming and desktop usage. Create the configuration file with this command:
+# We will set `scx_lavd` as our default scheduler. It is currently the best scheduler for gaming latency
+# on modern cpus, as it prioritizes critical game threads over background noise.
 
 sudo nano /etc/scx_loader/config.toml
-# Set the bpfland scheduler as default and configure it for gaming mode.
+
+# Set the lavd scheduler as default and configure it for gaming mode.
 default_sched = "scx_bpfland"
 default_mode = "Gaming"
  
-[scheds.scx_bpfland]
-auto_mode = []
+[scheds.scx_lavd]
+auto_mode = ["--performance"]
 gaming_mode = ["-m", "performance"]
-lowlatency_mode = ["-s", "5000", "-S", "500", "-l", "5000", "-m", "performance"]
-powersave_mode = ["-m", "powersave"]
 
+### Important: Disable IRQBalance
+# If you are using `scx_scheds`, you MUST disable `irqbalance`. It fights with the scheduler causing micro-stutters.
+
+sudo systemctl disable --now irqbalance
 
 # Step 2: Enable and Start the Scheduler Service
 sudo systemctl enable --now scx_loader
@@ -199,28 +203,38 @@ sudo nano /etc/default/grub
 Add these parameters to `GRUB_CMDLINE_LINUX`:
 
 ```bash
-GRUB_CMDLINE_LINUX="quiet lpj=XXXXXXX mitigations=off skew_tick=1 nowatchdog page_alloc.shuffle=1 pci=pcie_bus_perf intel_idle.max_cstate=1 processor.max_cstate=1 libahci.ignore_sss=1 noautogroup amd_pstate=active"
+GRUB_CMDLINE_LINUX="quiet splash amdgpu.ppfeaturemask=0xffffffff split_lock_detect=off amd_pstate=active page_alloc.shuffle=1 pci=pcie_bus_perf pcie_aspm.policy=performance usbcore.autosuspend=-1 nowatchdog nmi_watchdog=0 zswap.enabled=0"
 ```
+### Parameter Breakdown:
 
-**Get the LPJ value:**
+amd_pstate=active: **CRITICAL for Zen 3/4/5. Enables the EPP driver for millisecond-speed clock boosting. (Intel users: remove this).**
 
-```bash
-sudo dmesg | grep -o "lpj=[0-9]*"
-# Then replace XXXXXXX in GRUB_CMDLINE_LINUX with the value shown in the output
-```
+amdgpu.ppfeaturemask=0xffffffff:  **CRITICAL for AMD GPU. Unlocks voltage control and overclocking limits (essential for LACT/CoreCtrl).**
+
+split_lock_detect=off:  **Prevents SIGBUS crashes and stutters in games that use "split locks" (anti-cheat often does this).**
+
+nowatchdog & nmi_watchdog=0:  **Disables CPU cycle-wasting watchdog timers. Reduces micro-stutter.**
+
+zswap.enabled=0:  **Disables ZSWAP to lower latency. (Only do this if you have 32GB+ RAM. If you have 4-16GB, remove this).**
+
+pci=pcie_bus_perf:  **Forces PCIe bus to max payload size (Maximum GPU/NVMe bandwidth).**
+
+pcie_aspm.policy=performance:  **Disables PCIe power saving states. Fixes idle latency spikes. (its basically better then pcie_aspm=off)!**
+
+usbcore.autosuspend=-1:  **Prevents USB devices from sleeping. Fixes "wake up" lag.**
+
+## Experimental (Use at your own risk):
+**mitigations=off: Disables CPU security patches.**
+
+Good for: **Older CPUs (Zen 1/2/3, Intel 9th gen and older).** ~3% fps gain.
+
+Bad for: **Zen 4 / Zen 5 (Ryzen 7000/9000).** Can actually lower 1% low FPS due to branch prediction logic. **Zen 4 users should NOT use this!**
 
 ### Update GRUB Configuration
 
 ```bash
 sudo grub2-mkconfig -o /boot/grub2/grub.cfg
 ```
-
-**Parameter Explanations:**
-
-- `mitigations=off` - Disables CPU vulnerability mitigations for better performance
-- `nowatchdog` - Disables hardware watchdog
-- `intel_idle.max_cstate=1` - Limits CPU idle states for lower latency (intel only)
-- `amd_pstate=active` - Enables AMD P-State driver for better power management
 
 -----
 
@@ -244,17 +258,6 @@ sudo systemctl enable --now fstrim.timer
 
 # Run manual TRIM
 sudo fstrim -v /
-```
-
-### Graphics Optimization (AMD Users)
-
-Add to `/etc/environment`:
-
-```bash
-# AMD GPU optimizations
-RADV_PERFTEST=gpl
-mesa_glthread=true
-AMD_VULKAN_ICD=RADV
 ```
 
 ### CPU Scaling Configuration
@@ -321,6 +324,9 @@ sudo udevadm trigger
 
 # Verify your current I/O schedulers
 cat /sys/block/*/queue/scheduler
+
+# or
+grep "" /sys/block/*/queue/scheduler
 ```
 
 -----
@@ -351,17 +357,52 @@ sudo dnf install portproton
 
 ### Steam Optimizations
 
-Add to Steam launch options for games:
+If you installed the **CachyOS Kernel**, you have access to NTSync and FSR4 features (amd rdna 4 (rx90**) gpus).
 
+**For Native HDR Games (Cyberpunk, Elden Ring, etc):**
 ```bash
-gamemoderun %command%
+MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 277 --hdr-enabled --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
 ```
+## Environment Variables & Wrappers
 
-Or for Proton games:
+MANGOHUD_CONFIG="fps_limit=277,no_display": **This configures the MangoHud layer silently.**
 
-```bash
-gamemoderun DXVK_ASYNC=1 %command%
-```
+fps_limit=277: **This is your manual "low latency" mode(like amd antilag). Take your monitor's max Refresh Rate and subtract 3 (e.g., 280Hz - 3 = 277 FPS). This keeps the framerate strictly inside your FreeSync range, preventing V-Sync backpressure and minimizing input lag.**
+
+no_display: **Hides the overlay so you don't see the stats, but the limiter still works in the background.**
+
+mangohud: **Actually injects the HUD layer. Without this, the config above does nothing.**
+
+LD_PRELOAD="": **this fixes Steam stuttering issues after playing for like 25-30+ minutes**
+
+AMD_USERQ=1: **(RDNA 3/4 Only) Enables User Queues. Lets the game talk directly to the GPU hardware queues, bypassing some kernel driver overhead. Basically free CPU performance.**
+
+PROTON_NTSYNC=1: **(Requires CachyOS Kernel) Replaces the old fsync/esync emulation with a proper kernel-level driver for Windows threading. Massively reduces CPU overhead in complex games.**
+
+gamemoderun: **Just a feral gamemode option**
+
+## Gamescope Arguments (The Container)
+
+gamescope: **Valve's micro-compositor. It isolates the game window from your desktop, fixing Alt-Tab crashes and handling resolution/HDR perfectly.**
+
+-W 2560 -H 1440: **Sets the internal resolution the game thinks it is running at. Set this to your monitor's native resolution (like 1920x1080 etc)**
+
+-r 280: **Sets the refresh rate cap for the Gamescope container. Match this exactly to your monitor's max Hz (144hz, 180, 60, 100 etc).**
+
+--hdr-enabled: **Unlocks HDR output. Essential for oled/ips to actually trigger HDR mode.**
+
+--force-grab-cursor: **Prevents your mouse from accidentally clicking outside the game window onto a second monitor.**
+
+--adaptive-sync: **Explicitly enables VRR (FreeSync/G-Sync) inside the container so you don't get screen tearing**
+
+--sharpness 2: **Applies a high-quality CAS sharpening filter.**
+How it works: **The scale is 0 to 20, where 0 is Maximum Sharpening and 20 is Least Sharpening. A value of 2 provides a very crisp, detailed image.**
+
+-f: **Forces the container to display in Fullscreen mode.**
+
+--: **The separator. It tells Gamescope "My settings stop here, the game command starts next."**
+
+%command%: **Steam automatically replaces this with the actual game executable.**
 
 -----
 
@@ -448,7 +489,7 @@ sudo nano /etc/tlp.conf
 **Configure Swap Behavior:**
 ```bash
 # Reduce swappiness for better performance
-echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+echo 'vm.swappiness=150' | sudo tee -a /etc/sysctl.conf
 
 # Improve memory allocation for gaming, etc.
 echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
@@ -504,12 +545,14 @@ sudo dnf install rocm-opencl rocm-smi
 ### AMD Performance Tweaks
 
 ```bash
-# Create AMD GPU optimization config
+## Optional! Some of these tweaks can reduce your fps or make games unstable!
+# Check performance and stability of games after making any changes
+
 sudo nano /etc/environment.d/99-amd-gaming.conf
-# Enable GPU Threading
+# Enable GPU Threading (its a really good option for minecraft, but may lower your fps in most of games)
 mesa_glthread=true
 
-# RadeonSI optimizations
+# RadeonSI optimizations (somethimes radv driver works worse than mesa. test everything!)
 RADV_PERFTEST=gpl,nggc,sam,rt
 AMD_VULKAN_ICD=RADV
 
@@ -517,7 +560,7 @@ AMD_VULKAN_ICD=RADV
 VDPAU_DRIVER=radeonsi
 LIBVA_DRIVER_NAME=radeonsi
 
-# Enable Resizable BAR
+# Enable Resizable BAR (if for some reason rebar does not work for you)
 AMD_GPU_ALLOW_RESIZE_BAR=1
 ```
 
@@ -546,15 +589,31 @@ WantedBy=multi-user.target
 sudo systemctl enable --now amd-gpu-performance.service
 ```
 
-### AMD Memory Overclocking (Advanced, dont attempt to do this without experience)
+    
+### Enable AMD User Queues (RDNA 3/4 specific)
+Allows the game to talk directly to the GPU, bypassing kernel overhead
+Or you can simply add it to the game launch options in Steam
 
 ```bash
-# Check current memory clock
-cat /sys/class/drm/card*/device/pp_dpm_mclk
+AMD_USERQ=1
+```
 
-# Overclock VRAM (example, adjust values carefully)
-echo "manual" | sudo tee /sys/class/drm/card*/device/power_dpm_force_performance_level
-echo "3" | sudo tee /sys/class/drm/card*/device/pp_dpm_mclk
+
+### AMD Lact (like AMD Adrenalin on Windows, allows configurin mv offset, memory clock, wattage control, fan curve etc.)
+
+```bash
+### Since we added `amdgpu.ppfeaturemask=0xffffffff` to GRUB, you can now use LACT to undervolt/overclock your card for stability and higher boost clocks!
+
+# Enable the copr repository:
+sudo dnf copr enable ilyaz/LACT
+
+# Install the package (alternative packages: lact-headless, lact-libadwaita):
+sudo dnf install lact
+
+# Enable the service:
+sudo systemctl enable --now lactd
+
+## As for rx9070xt users, i recommend to start with "Performance Level: Manual", -70mv voltage offset, lock your memory clock on 2714Mhz, set Power Limit to 355W. For undervolt, set PL to 260-270W.
 ```
 
 </details>
@@ -602,9 +661,6 @@ sudo dnf install xorg-x11-drv-nvidia-libs.i686
 
 # Install NVIDIA settings utility
 sudo dnf install nvidia-settings
-
-# Install additional tools for monitoring
-sudo dnf install nvidia-ml-py3
 ```
 
 #### Post-Installation Verification
@@ -649,7 +705,7 @@ sudo reboot
 
 -----
 
-### ⚡ NVIDIA Wayland Performance Optimizations
+### NVIDIA Wayland Performance Optimizations
 
 #### 1. Environment Variables for Wayland
 
@@ -660,7 +716,7 @@ Add to `/etc/environment`:
 ```bash
 # Core NVIDIA Wayland optimizations
 #
-# Critical Warning for Modern NVIDIA GPUs (RTX 20-Series and Newer)
+# Critical Warning for Modern NVIDIA GPUs (RTX 20 series and newer)
 #
 # Based on user feedback and testing, the following two env variables (`GBM_BACKEND` and `__GLX_VENDOR_LIBRARY_NAME`) can cause severe system-wide input lag, stuttering, and application unresponsiveness on NVIDIA RTX 20, 30, 40, and 50 series gpus
 #
@@ -723,7 +779,7 @@ WLR_DRM_NO_ATOMIC=1
 WLR_NO_HARDWARE_CURSORS=1
 ```
 
-#### 2. Kernel Module Parameters
+#### 2. Kernel Module Parameters (use if you know what you're doing)
 
 Modern NVIDIA drivers benefit from specific kernel parameters that can improve performance
 Test each option if it works in ur case and with you hardware
@@ -768,12 +824,12 @@ gsettings set org.gnome.desktop.interface scaling-factor 1
 KDE Plasma has excellent Wayland support and works particularly well with NVIDIA drivers when properly configured.
 
 ```bash
-# Enable variable refresh rate support
-kwriteconfig5 --file kwinrc --group Compositing --key VariableRefreshRate true
+# Enable variable refresh rate support (or using kde settings which is better)
+kwriteconfig6 --file kwinrc --group Compositing --key VariableRefreshRate true
 
 # Optimize compositor settings for gaming
-kwriteconfig5 --file kwinrc --group Compositing --key LatencyPolicy Low
-kwriteconfig5 --file kwinrc --group Compositing --key RenderTimeEstimator 1
+kwriteconfig6 --file kwinrc --group Compositing --key LatencyPolicy Low
+kwriteconfig6 --file kwinrc --group Compositing --key RenderTimeEstimator 1
 
 # Restart KWin to apply changes
 qdbus org.kde.KWin /KWin reconfigure
@@ -803,7 +859,7 @@ gamemoderun __GL_SYNC_TO_VBLANK=0 __GL_THREADED_OPTIMIZATIONS=1 %command%
 # Standard Proton optimization
 gamemoderun __GL_THREADED_OPTIMIZATIONS=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
 
-# Advanced optimization with DXVK async compilation
+# Advanced optimization with dxvk async/gpl compilation
 gamemoderun __GL_THREADED_OPTIMIZATIONS=1 DXVK_ASYNC=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
 
 # For games requiring maximum performance
@@ -858,9 +914,6 @@ Modern NVIDIA drivers support variable refresh rate on Wayland, providing smooth
 gsettings set org.gnome.mutter experimental-features "['variable-refresh-rate']"
 # Or in Display settings (if supported)
 
-# For KDE Plasma, enable in system settings or via command:
-kwriteconfig5 --file kwinrc --group Compositing --key VariableRefreshRate true
-
 # Verify VRR is working
 sudo dnf install drm_info
 drm_info | grep -i vrr
@@ -887,22 +940,20 @@ Effective performance monitoring helps identify bottlenecks and verify that opti
 sudo dnf install nvtop mangohud goverlay
 
 # Create monitoring script for gaming sessions
-sudo nano /usr/local/bin/nvidia-gaming-monitor.sh
+sudo nano /usr/local/bin/nvidia-monitor.sh
 #!/bin/bash
-echo "=== NVIDIA Performance Monitor ==="
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
 echo "Driver: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader)"
-echo "=== Real-time Stats ==="
 nvidia-smi dmon -s pucvmet
 
-sudo chmod +x /usr/local/bin/nvidia-gaming-monitor.sh
+sudo chmod +x /usr/local/bin/nvidia-monitor.sh
 ```
 
 -----
 
 ### Power Management and Thermal Optimization
 
-#### 1. Advanced Power Management
+#### Advanced Power Management (apply only if you know what youre doing)
 
 Proper power management ensures consistent performance while preventing unnecessary power consumption during idle periods.
 
@@ -915,36 +966,6 @@ sudo nano /etc/udev/rules.d/80-nvidia-pm.rules
 # Enable runtime PM for NVIDIA VGA/3D controller devices
 SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", TEST=="power/control", ATTR{power/control}="auto"
 SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", TEST=="power/control", ATTR{power/control}="auto"
-```
-
-#### 2. Thermal Management
-
-Effective thermal management prevents throttling and maintains optimal performance during extended gaming sessions.
-
-```bash
-# Install thermal monitoring tools
-sudo dnf install lm_sensors
-
-# Configure sensor detection
-sudo sensors-detect --auto
-
-# Create thermal monitoring script
-sudo nano /usr/local/bin/nvidia-thermal.sh
-#!/bin/bash
-TEMP=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits)
-POWER=$(nvidia-smi --query-gpu=power.draw --format=csv,noheader,nounits)
-
-echo "GPU Temperature: ${TEMP}°C"
-echo "Power Draw: ${POWER}W"
-
-# Alert if temperature is high
-if [ $TEMP -gt 83 ]; then
-    echo "WARNING: GPU temperature is high!"
-    notify-send "GPU Temperature Warning" "GPU is running at ${TEMP}°C"
-fi
-
-
-sudo chmod +x /usr/local/bin/nvidia-thermal.sh
 ```
 
 -----
@@ -1038,50 +1059,6 @@ nvidia-smi --query-gpu=power.draw --format=csv --loop=1
 
 -----
 
-### NVIDIA Developer and AI Tools
-
-#### CUDA Development Environment
-
-Setting up CUDA properly ensures compatibility with AI frameworks and development tools.
-
-```bash
-# Install CUDA toolkit
-sudo dnf install cuda-toolkit cuda-devel cuda-runtime
-
-# Configure environment variables
-echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
-echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
-echo 'export CUDA_HOME=/usr/local/cuda' >> ~/.bashrc
-
-# Reload environment
-source ~/.bashrc
-
-# Verify CUDA installation
-nvcc --version
-nvidia-smi --query-gpu=compute_cap --format=csv
-```
-
-#### Container Support for AI/ML Workloads
-
-Container support enables easy deployment of AI and machine learning applications.
-
-```bash
-# Install NVIDIA Container Toolkit
-curl -fsSL https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo | \
-  sudo tee /etc/yum.repos.d/nvidia-container-toolkit.repo
-
-sudo dnf install nvidia-container-toolkit
-
-# Configure Docker/Podman
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
-
-# Test container support
-sudo docker run --rm --gpus all nvidia/cuda:12.7-runtime-ubuntu25.04 nvidia-smi
-```
-
------
-
 ### Performance Monitoring and Benchmarking
 
 #### Comprehensive Monitoring Setup
@@ -1091,30 +1068,6 @@ Effective monitoring helps optimize performance and identify potential issues be
 ```bash
 # Install comprehensive monitoring suite
 sudo dnf install nvtop btop mangohud goverlay
-
-# Create performance monitoring script
-sudo nano /usr/local/bin/nvidia-perf-monitor.sh
-#!/bin/bash
-clear
-echo "=== NVIDIA Performance Monitor ==="
-echo "System: $(hostnamectl --static) | $(date)"
-echo "Driver: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader)"
-echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
-echo ""
-
-# GPU utilization and memory
-nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,clocks.gr,clocks.mem --format=csv
-
-echo ""
-echo "=== Active GPU Processes ==="
-nvidia-smi pmon -c 1
-
-echo ""
-echo "Press Ctrl+C to exit continuous monitoring..."
-watch -n 2 nvidia-smi
-
-
-sudo chmod +x /usr/local/bin/nvidia-perf-monitor.sh
 ```
 
 #### Gaming Performance Overlay
@@ -1125,7 +1078,7 @@ MangoHud provides real-time performance metrics during gaming sessions.
 # Configure MangoHud for optimal display
 mkdir -p ~/.config/MangoHud
 
-nano > ~/.config/MangoHud/MangoHud.conf
+nano ~/.config/MangoHud/MangoHud.conf
 # GPU and CPU information
 gpu_stats
 cpu_stats
@@ -1176,11 +1129,11 @@ log_duration=60
 ### Performance Monitoring Tools
 
 ```bash
-# Install useful monitoring tools
-sudo dnf install htop iotop powertop fastfetch
+# Install monitoring tool
+sudo dnf install btop
 
 # For detailed system information
-sudo dnf install hardinfo
+sudo dnf install hardinfo2
 ```
 
 ### Benchmark Tools
@@ -1249,43 +1202,41 @@ Based on testing, users can expect:
 <details>
 <summary>👀 Нажмите для просмотра русской версии</summary>
     
-# 🚀 Руководство по оптимизации Fedora для игр и производительности
+# Гайд по оптимизации производительности и гейминга Fedora Linux 43
 
-# ОБНОВЛЯЕТСЯ С ЗАДЕРЖКОЙ, если хотите видеть самые последние и свежие изменения в этом гайде, то читайте английскую версию
+> **Полное руководство по оптимизации Fedora 43 для максимальной производительности, гейминга, повседневного использования и т.д. | от winterofhell**
 
-## 🧭 Быстрая навигация
+## Быстрая навигация
 
-| Настройка и ядро                                                                  | Система и игры                                                                 | Ресурсы и другое                                                                       |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| [**Информация о системе**](#-информация-о-системе)                                | [**Продвинутые настройки**](#-продвинутые-системные-настройки)                  | [**Мониторинг и проверка**](#-мониторинг-и-проверка)                                    |
-| [**Первоначальная настройка**](#-первоначальная-настройка-и-подготовка)            | [**Игровые оптимизации**](#-игровые-оптимизации)                               | [**Устранение неполадок**](#-устранение-неполадок)                                      |
-| [**Оптимизация ядра**](#-оптимизация-ядра)                                        | [**Обслуживание и очистка**](#-обслуживание-и-очистка)                         | [**Полная русская версия**](#-русская-версия--russian-translation)                      |
-| [**Параметры ядра GRUB**](#️-параметры-ядра-grub)                                    | [**Оптимизация драйверов**](#️-оптимизация-графических-драйверов)              |                                                                                        |
+| Настройка и ядро                                                              | Система и гейминг                                                            | Ресурсы                                                                 |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [**Информация о системе**](#информация-о-системе)                              | [**Продвинутые системные твики**](#продвинутые-системные-твики)                     | [**Мониторинг и проверка**](#мониторинг-и-проверка)               |
+| [**Начальная настройка**](#начальная-настройка-и-подготовка)             | [**Оптимизация для гейминга**](#оптимизация-для-гейминга)                         | [**Решение проблем**](#решение-проблем)                                  |
+| [**Оптимизация ядра**](#оптимизация-ядра)                            | [**Обслуживание и очистка**](#обслуживание-и-очистка)                        | [**Английская версия**](#english-version)     |
+| [**Параметры ядра GRUB**](#параметры-ядра-grub)                       | [**Оптимизация графических драйверов**](#оптимизация-графических-драйверов)          |                                                                           |
 
-> **Полное руководство по оптимизации Fedora 42 для игр и максимальной производительности | от winterofhell**
+## Информация о системе
 
-## 📋 Информация о системе
+**Тестовое окружение:**
 
-**Среда тестирования:**
+- **Период:** 14 октября 2024 - 31 декабря 2025
+- **Дистрибутив:** Fedora 43
+- **Дополнительное тестирование:** Системы с NVIDIA и AMD видеокартами
+- **Эти оптимизации могут работать и на других дистрибутивах, но я не могу этого гарантировать. Всегда необходимо всё тестировать. Около 90% этих твиков работают на Arch и NixOS :)**
 
-- **Период проверки:** 14 октября 2024 - 7 сентября 2025
-- **Дистрибутив:** Fedora 42 (Minimal ISO + Sway WM | Второй ПК: Fedora GNOME Edition | Fedora KDE Edition)
-- **Дополнительное тестирование:** GNOME DE на системах с NVIDIA и AMD
-- **Это может также работать на любом другом дистрибутиве, но я не могу гарантировать, что все эти настройки будут работать на вашей системе. Но 80% твиков работают на всех системах, включая Arch / NixOS :)**
+**Конфигурации железа (протестировано на):**
 
-**Конфигурации оборудования (протестировано на):**
-
-- **Основная:** Ryzen 5 5500U, 20ГБ DDR4, RX550X дискретная/RX Vega 7 встроенная, NVMe диск
-- **Вторая:** Ryzen 5 5600, 16ГБ DDR4, GTX 1060, SATA SSD
-- **Новая:** Ryzen 5 7500f, 32Гб DDR5, RX 9070 XT, Nvme M2.
+- **Первая:** Ryzen 5 5500U, 20GB DDR4, RX550X/RX Vega 7, NVMe
+- **Вторая:** Ryzen 5 5600, 16GB DDR4, GTX 1060, SATA SSD
+- **Третья:** Ryzen 5 7500f, 32Gb DDR5, RX 9070 XT, Nvme
 
 -----
 
-## 🛠 Первоначальная настройка и подготовка
+## Начальная настройка и подготовка
 
 ### 1. Минимальная установка
 
-Для оптимальной производительности всегда начинайте с **Fedora Minimal ISO**. Этот iso исключает ненужные пакеты и службы, которые могут влиять на системные ресурсы. Но, это не обязательно делать.
+Для оптимальной производительности всегда начинайте с **Fedora Minimal ISO**. Этот подход исключает ненужные пакеты и сервисы, которые могут влиять на ресурсы системы. Но это необязательно.
 
 ### 2. Включение репозиториев RPM Fusion
 
@@ -1296,11 +1247,11 @@ sudo dnf install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-rele
 sudo dnf install https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
 ```
 
-📖 **Официальное руководство:** [Конфигурация RPM Fusion](https://rpmfusion.org/Configuration)
+**Официальный гайд:** [Настройка RPM Fusion](https://rpmfusion.org/Configuration)
 
-### 3. Конфигурация SELinux (опционально)
+### 3. Настройка SELinux (опционально)
 
-⚠️ **Предупреждение о безопасности:** Отключение SELinux снижает безопасность системы, но также делает вашу систему немного быстрее. Продолжайте только если понимаете последствия. (Лично я не забочусь о SELinux и всегда отключаю его.)
+**Предупреждение о безопасности:** Отключение SELinux снижает безопасность системы, но также делает вашу систему немного быстрее. Продолжайте только если понимаете последствия. (Лично мне плевать на SELinux и я всегда его отключаю)
 
 **Временное отключение (до перезагрузки):**
 
@@ -1308,87 +1259,71 @@ sudo dnf install https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfre
 sudo setenforce 0
 ```
 
-**Постоянное отключение (требует перезагрузки):**
+**Постоянное отключение (требуется перезагрузка):**
 
 ```bash
 sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
-# Для применения изменений требуется перезагрузка
+# Требуется перезагрузка для применения изменений
 ```
 
 ### 4. Обновление системы
 
-Всегда начинайте с полностью обновленной системы:
+Всегда начинайте с полностью обновлённой системы:
 
 ```bash
 sudo dnf upgrade --refresh
 
-# Установите обновления прошивки (включая микрокод ЦП)
+# Установка обновлений прошивки (включая микрокод CPU)
 sudo dnf install linux-firmware intel-ucode amd-ucode
 ```
 
 -----
 
-## ⚡ Оптимизация ядра
+## Оптимизация ядра
 
 ### Установка ядра CachyOS
 
-Ядро CachyOS обеспечивает значительное улучшение производительности для игр и общей отзывчивости системы.
+Ядро CachyOS обеспечивает значительное улучшение производительности для гейминга и общей отзывчивости системы.
 
-**Предварительные требования:** ЦП должен поддерживать набор инструкций x86_64_v3 !!
+**Требования:** Процессор должен поддерживать набор инструкций x86_64_v3 !!
 
 ```bash
-# Проверка поддержки ЦП
+# Проверка поддержки CPU
 # Проверьте поддержку следующей командой
 
 /lib64/ld-linux-x86-64.so.2 --help | grep "(supported, searched)"
 
-# Если это не обнаружит поддержку x86_64_v3, НЕ устанавливайте это ядро. Если обнаружит только x86_64_v2, вы можете использовать LTS ядро.
+# Если не определяется поддержка x86_64_v3, НЕ устанавливайте это ядро. Если определяется только x86_64_v2, можете использовать LTS-ядро.
 ```
 
 ```bash
-# Добавить репозиторий COPR CachyOS
+# Добавление COPR-репозитория CachyOS
 sudo dnf copr enable bieszczaders/kernel-cachyos
+sudo dnf copr enable bieszczaders/kernel-cachyos-addons
 
-# Установить ядро CachyOS
+# Установка ядра CachyOS
 sudo dnf install kernel-cachyos kernel-cachyos-devel
 
-# Для x86_64_v2 (старые CPUs):
+# Только для x86_64_v2 (старые процессоры):
 sudo dnf install kernel-cachyos-lts kernel-cachyos-lts-devel-matched
 ```
 
-📖 **Дополнительная информация:** [Установка ядра CachyOS](https://copr.fedorainfracloud.org/coprs/bieszczaders/kernel-cachyos/)
-
-### Установка UKSMD
-
-UKSMD (Userspace Kernel Same-page Merging Daemon) снижает использование памяти и улучшает отзывчивость системы:
-
-```bash
-# Добавить репозиторий дополнений UKSMD
-sudo dnf copr enable bieszczaders/kernel-cachyos-addons
-
-# Установить UKSMD
-sudo dnf install uksmd
-
-# Включить и запустить службу UKSMD
-sudo systemctl enable --now uksmd
-```
-
-📖 **Дополнительная информация:** [Дополнения UKSMD](https://copr.fedorainfracloud.org/coprs/bieszczaders/kernel-cachyos-addons/)
+**Подробнее:** [Установка ядра CachyOS](https://copr.fedorainfracloud.org/coprs/bieszczaders/kernel-cachyos/)
 
 -----
 
-## 🔧 Оптимизация системных служб
+## Оптимизация системных сервисов
 
 ### Установка Ananicy-cpp
 
-Ananicy-cpp автоматически управляет приоритетами процессов и снижает задержки системы:
+Ananicy-cpp автоматически управляет приоритетами процессов и снижает системную задержку:
 
 ```bash
-# Установить зависимости для сборки
+# Установка зависимостей для сборки
 sudo dnf group install "Development Tools"
 sudo dnf install cmake systemd-devel spdlog-devel fmt-devel nlohmann-json-devel make automake gcc gcc-c++
 
-# Клонировать и собрать
+# Клонирование и сборка
 git clone https://gitlab.com/ananicy-cpp/ananicy-cpp.git
 cd ananicy-cpp
 mkdir build && cd build
@@ -1396,13 +1331,51 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j$(nproc)
 sudo make install
 
-# Включить службу
+# Включение сервиса
 sudo systemctl enable --now ananicy-cpp
+
+### Использование автоматизированных твиков CachyOS
+
+# Команда CachyOS предоставляет мощные пакеты, которые могут автоматизировать многие продвинутые твики. Это более простой и безопасный подход, чем ручная настройка десятков системных параметров :)
+
+# 1. Установка пакетов оптимизации CachyOS
+sudo dnf install cachyos-settings cachyos-ksm-settings scx-scheds
+
+# 2. Продвинутая оптимизация планировщика CPU (SCX)
+# Это один из самых значимых твиков для отзывчивости системы и производительности в играх. Мы заменим стандартный планировщик Linux на специализированный из пакета `scx-scheds`, который мы установили ранее.
+# Примечание: Это продвинутый твик. Хотя он даёт значительный прирост, он меняет ключевой компонент системы !!
+
+# Шаг 1: Настройка планировщика по умолчанию
+# Мы установим `scx_lavd` в качестве планировщика по умолчанию. Это на данный момент лучший планировщик для игровых задержек
+# на современных процессорах, так как он приоритизирует критичные игровые потоки над фоновым шумом.
+
+sudo nano /etc/scx_loader/config.toml
+
+# Установите планировщик lavd по умолчанию и настройте его для игрового режима.
+default_sched = "scx_bpfland"
+default_mode = "Gaming"
+ 
+[scheds.scx_lavd]
+auto_mode = ["--performance"]
+gaming_mode = ["-m", "performance"]
+
+### Важно: Отключите IRQBalance
+# Если вы используете `scx_scheds`, вы ДОЛЖНЫ отключить `irqbalance`. Он конфликтует с планировщиком, вызывая микрофризы.
+
+sudo systemctl disable --now irqbalance
+
+# Шаг 2: Включите и запустите сервис планировщика
+sudo systemctl enable --now scx_loader
+
+# Шаг 3: Проверьте изменение
+dbus-send --system --print-reply --dest=org.scx.Loader /org/scx/Loader org.freedesktop.DBus.Properties.Get string:org.scx.Loader string:CurrentScheduler
+# вывод должен показать string "scx_bpfland".
+
 ```
 
-### Управление службами
+### Управление сервисами
 
-Отключите ненужные службы для освобождения системных ресурсов:
+Отключите ненужные сервисы для освобождения системных ресурсов:
 
 ```bash
 sudo systemctl disable --now \
@@ -1417,13 +1390,13 @@ sudo systemctl disable --now \
     upower.service
 ```
 
-💡 **Совет:** Отключайте только службы, которые вам не нужны. Просмотрите каждую службу перед отключением, чтобы не сломать функциональность, на которую вы полагаетесь.
+**Совет:** Отключайте только те сервисы, которые вам не нужны. Изучите каждый сервис перед отключением, чтобы не сломать функционал, на который вы полагаетесь. Также вы можете искать сервисы вручную в интернете/некоторых приложениях
 
 -----
 
-## ⚙️ Параметры ядра GRUB
+## Параметры ядра GRUB
 
-### Конфигурация
+### Настройка
 
 Отредактируйте `/etc/default/grub` и измените командную строку ядра:
 
@@ -1434,14 +1407,32 @@ sudo nano /etc/default/grub
 Добавьте эти параметры в `GRUB_CMDLINE_LINUX`:
 
 ```bash
-GRUB_CMDLINE_LINUX="quiet lpj=XXXXXXX mitigations=off elevator=mq-deadline nowatchdog page_alloc.shuffle=1 pci=pcie_bus_perf intel_idle.max_cstate=1 processor.max_cstate=1 libahci.ignore_sss=1 noautogroup amd_pstate=active"
+GRUB_CMDLINE_LINUX="quiet splash amdgpu.ppfeaturemask=0xffffffff split_lock_detect=off amd_pstate=active page_alloc.shuffle=1 pci=pcie_bus_perf pcie_aspm.policy=performance usbcore.autosuspend=-1 nowatchdog nmi_watchdog=0 zswap.enabled=0"
 ```
+### Расшифровка параметров:
 
-**Получить значение LPJ:**
+amd_pstate=active: **КРИТИЧНО для Zen 3/4/5. Включает драйвер EPP для разгона с миллисекундной скоростью. (Пользователи Intel: удалите этот параметр).**
 
-```bash
-sudo dmesg | grep -o "lpj=[0-9]*"
-```
+amdgpu.ppfeaturemask=0xffffffff: **КРИТИЧНО для AMD GPU. Разблокирует контроль напряжения и лимиты разгона (необходимо для LACT/CoreCtrl).**
+
+split_lock_detect=off: **Предотвращает крэши SIGBUS и фризы в играх, использующих "split locks" (античит часто это делает).**
+
+nowatchdog & nmi_watchdog=0: **Отключает watchdog-таймеры, тратящие циклы CPU. Уменьшает микрофризы.**
+
+zswap.enabled=0: **Отключает ZSWAP для снижения задержек. (Делайте это только если у вас 32GB+ RAM. Если у вас 4-16GB, удалите этот параметр).**
+
+pci=pcie_bus_perf: **Принудительно устанавливает максимальный размер payload для шины PCIe (Максимальная пропускная способность GPU/NVMe).**
+
+pcie_aspm.policy=performance: **Отключает состояния энергосбережения PCIe. Исправляет скачки задержек в idle. (это лучше чем pcie_aspm=off)!**
+
+usbcore.autosuspend=-1: **Предотвращает переход USB-устройств в спящий режим. Исправляет задержку "пробуждения".**
+
+## Экспериментальные (Используйте на свой риск):
+**mitigations=off: Отключает патчи безопасности CPU.**
+
+Хорошо для: **Старых CPU (Zen 1/2/3, Intel 9-го поколения и старше).** ~3% прирост fps.
+
+Плохо для: **Zen 4 / Zen 5 (Ryzen 7000/9000).** Может фактически снизить 1% low FPS из-за логики предсказания переходов. **Пользователям Zen 4 НЕ следует использовать это!**
 
 ### Обновление конфигурации GRUB
 
@@ -1449,50 +1440,31 @@ sudo dmesg | grep -o "lpj=[0-9]*"
 sudo grub2-mkconfig -o /boot/grub2/grub.cfg
 ```
 
-**Объяснение параметров:**
-
-- `mitigations=off` - Отключает смягчения уязвимостей ЦП для лучшей производительности
-- `elevator=mq-deadline` - Использует планировщик ввода-вывода deadline (лучше для SSD, чем noop)
-- `nowatchdog` - Отключает аппаратный watchdog
-- `intel_idle.max_cstate=1` - Ограничивает состояния простоя ЦП для меньшей задержки (только Intel)
-- `amd_pstate=active` - Включает драйвер AMD P-State для лучшего управления питанием
-
 -----
 
-## 🎯 Продвинутые системные настройки
+## Продвинутые системные твики
 
 ### Управление памятью
 
-**Включить systemd-oomd (демон нехватки памяти):**
+**Включите systemd-oomd (демон Out-of-Memory):**
 
 ```bash
 sudo systemctl enable --now systemd-oomd
 ```
 
-### Оптимизация хранилища
+### Оптимизация накопителя
 
-**Включить TRIM для SSD:**
+**Включите TRIM для SSD:**
 
 ```bash
-# Включить автоматический TRIM
+# Включение автоматического TRIM
 sudo systemctl enable --now fstrim.timer
 
-# Запустить ручной TRIM
+# Запуск ручного TRIM
 sudo fstrim -v /
 ```
 
-### Оптимизация графики (пользователи AMD)
-
-Добавить в `/etc/environment`:
-
-```bash
-# Оптимизации AMD GPU
-RADV_PERFTEST=gpl
-mesa_glthread=true
-AMD_VULKAN_ICD=RADV
-```
-
-### Конфигурация масштабирования ЦП
+### Настройка масштабирования CPU
 
 **Для систем AMD:**
 
@@ -1508,29 +1480,62 @@ echo "passive" | sudo tee /sys/devices/system/cpu/intel_pstate/status
 
 ### Системные лимиты
 
-**Увеличить лимит дескрипторов файлов** в `/etc/security/limits.conf`:
+**Увеличьте лимит файловых дескрипторов** в `/etc/security/limits.conf`:
 
 ```bash
-# Замените 'yourusername' на ваше фактическое имя пользователя
+# Замените 'yourusername' на ваше реальное имя пользователя
 yourusername hard nofile 1048576
 yourusername soft nofile 1048576
 ```
 
-### Балансировка IRQ (пользователи Intel iGPU)
+### IRQ Balance (пользователи Intel iGPU)
 
-Если возникают проблемы с производительностью с интегрированной графикой Intel:
+Если возникают проблемы с производительностью при использовании встроенной графики Intel:
 
 ```bash
-# Проверить статус
+# Проверка статуса
 sudo systemctl status irqbalance
 
-# Отключить при необходимости
+# Отключение при необходимости
 sudo systemctl disable --now irqbalance
+```
+
+### Настройка планировщика I/O
+
+Современные системы Linux используют правила udev для настройки планировщиков I/O для каждого типа устройства. Параметр ядра `elevator=` устарел и больше не работает на новых версиях ядра
+
+**Создайте правило udev для оптимального планирования I/O:**
+```bash
+sudo tee /etc/udev/rules.d/60-ioschedulers.rules
+# HDD (вращающиеся диски) - используйте mq-deadline для лучшей производительности
+ACTION=="add|change", KERNEL=="sd[a-z]*", ATTR{queue/rotational}=="1", ATTR{queue/scheduler}="mq-deadline"
+
+# SSD (невращающиеся диски) - используйте mq-deadline
+ACTION=="add|change", KERNEL=="sd[a-z]*|mmcblk[0-9]*", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="mq-deadline"
+
+# NVMe SSD - используйте 'none' для лучшей производительности
+# NVMe-диски имеют собственное продвинутое управление очередями и не получают выгоды от дополнительного планирования
+ACTION=="add|change", KERNEL=="nvme[0-9]*", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="none"
+
+спасибо netarchy за упоминание этого нового метода!
+```
+
+**Применить изменения немедленно:**
+```bash
+# Перезагрузить правила udev
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+# Проверить текущие планировщики I/O
+cat /sys/block/*/queue/scheduler
+
+# или
+grep "" /sys/block/*/queue/scheduler
 ```
 
 -----
 
-## 🎮 Игровые оптимизации
+## Оптимизация для гейминга
 
 ### Установка GameMode
 
@@ -1539,54 +1544,89 @@ GameMode применяет системные оптимизации во вр�
 ```bash
 sudo dnf install gamemode gamemode-devel
 
-# Проверить установку
+# Проверка установки
 gamemoded -t
 ```
 
 **Использование:** Запускайте игры с префиксом `gamemoderun` или настройте в параметрах запуска Steam.
 
-### Совместимость игр Windows
+### Совместимость с Windows-играми
 
-**PortProton** предлагает отличную совместимость для исполняемых файлов Windows (я использую PortProton вместо Lutris/Bottles и это мой любимый исполнитель proton!):
+**PortProton** предлагает отличную совместимость для исполняемых файлов Windows (я использую portproton вместо Lutris / Bottles и это моё любимое приложение для запуска proton!):
 
 ```bash
 sudo dnf copr enable boria138/portproton
 sudo dnf install portproton
 ```
 
-### Оптимизации Steam
+### Оптимизация Steam
 
-Добавьте в параметры запуска Steam для игр:
+Если вы установили **ядро CachyOS**, у вас есть доступ к функциям NTSync и FSR4 (видеокарты amd rdna 4 (rx90**)).
 
+**Для нативных HDR-игр (Cyberpunk, Elden Ring и т.д.):**
 ```bash
-gamemoderun %command%
+MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 277 --hdr-enabled --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
 ```
+## Переменные окружения и обёртки
 
-Или для игр Proton:
+MANGOHUD_CONFIG="fps_limit=277,no_display": **Настраивает слой MangoHud в тихом режиме.**
 
-```bash
-gamemoderun DXVK_ASYNC=1 %command%
-```
+fps_limit=277: **Это ваш ручной режим "низкой задержки" (как amd antilag). Возьмите максимальную частоту обновления вашего монитора и вычтите 3 (например, 280Hz - 3 = 277 FPS). Это удерживает частоту кадров строго в диапазоне FreeSync, предотвращая давление V-Sync и минимизируя задержку ввода.**
+
+no_display: **Скрывает оверлей, чтобы вы не видели статистику, но ограничитель всё равно работает в фоне.**
+
+mangohud: **Фактически внедряет слой HUD. Без этого вышеуказанная конфигурация ничего не делает.**
+
+LD_PRELOAD="": **это исправляет проблемы с фризами Steam после игры примерно 25-30+ минут**
+
+AMD_USERQ=1: **(Только RDNA 3/4) Включает пользовательские очереди. Позволяет игре напрямую общаться с аппаратными очередями GPU, обходя часть накладных расходов драйвера ядра. В основном бесплатная производительность CPU.**
+
+PROTON_NTSYNC=1: **(Требуется ядро CachyOS) Заменяет старую эмуляцию fsync/esync на правильный драйвер на уровне ядра для потоков Windows. Значительно снижает накладные расходы CPU в сложных играх.**
+
+gamemoderun: **Просто опция feral gamemode**
+
+## Аргументы Gamescope (контейнер)
+
+gamescope: **Микро-композитор от Valve. Изолирует игровое окно от рабочего стола, исправляя крэши при Alt-Tab и идеально обрабатывая разрешение/HDR.**
+
+-W 2560 -H 1440: **Устанавливает внутреннее разрешение, которое игра считает текущим. Установите это на нативное разрешение вашего монитора (например 1920x1080 и т.д.)**
+
+-r 280: **Устанавливает ограничение частоты обновления для контейнера Gamescope. Установите это точно на максимальные Hz вашего монитора (144hz, 180, 60, 100 и т.д.).**
+
+--hdr-enabled: **Разблокирует вывод HDR. Необходимо для oled/ips для фактической активации режима HDR.**
+
+--force-grab-cursor: **Предотвращает случайные клики мышью за пределами игрового окна на второй монитор.**
+
+--adaptive-sync: **Явно включает VRR (FreeSync/G-Sync) внутри контейнера, чтобы не было разрывов изображения**
+
+--sharpness 2: **Применяет высококачественный фильтр повышения резкости CAS.**
+Как это работает: **Шкала от 0 до 20, где 0 - Максимальная резкость, а 20 - Минимальная резкость. Значение 2 обеспечивает очень чёткое, детализированное изображение.**
+
+-f: **Заставляет контейнер отображаться в полноэкранном режиме.**
+
+--: **Разделитель. Сообщает Gamescope "Мои настройки заканчиваются здесь, дальше начинается команда игры".**
+
+%command%: **Steam автоматически заменяет это на фактический исполняемый файл игры.**
 
 -----
 
-## 🧹 Обслуживание и очистка
+## Обслуживание и очистка
 
 ### Управление кэшем пакетов
 
-**Очистить кэш DNF:**
+**Очистка кэша DNF:**
 
 ```bash
 sudo dnf clean all
 ```
 
-**Очистить системные журналы:**
+**Очистка системных журналов:**
 
 ```bash
-# Сохранить только последние 7 дней логов
+# Сохранять только последние 7 дней логов
 sudo journalctl --vacuum-time=7d
 
-# Или ограничить по размеру (сохранить только 100МБ)
+# Или ограничить по размеру (сохранять только 100MB)
 sudo journalctl --vacuum-size=100M
 ```
 
@@ -1596,65 +1636,52 @@ sudo journalctl --vacuum-size=100M
 
 ```bash
 #!/bin/bash
-# Сохранить как ~/maintenance.sh и сделать исполняемым
+# Сохраните как ~/maintenance.sh и сделайте исполняемым
 
-echo "🧹 Запуск обслуживания системы..."
+echo "Запуск обслуживания системы..."
 
-# Обновить систему
+# Обновление системы
 sudo dnf upgrade --refresh
 
-# Очистить кэш
+# Очистка кэшей
 sudo dnf clean all
 
-# Очистить старые записи журнала
+# Очистка старых записей журнала
 sudo journalctl --vacuum-time=7d
 
-# Запустить TRIM на SSD
+# Запуск TRIM на SSD
 sudo fstrim -v /
 
-echo "✅ Обслуживание завершено!"
+echo "Обслуживание завершено!"
 ```
 
 -----
 
-## 🖥️ Рекомендации по окружению рабочего стола
+## Рекомендации по окружению рабочего стола
 
-### Легкие альтернативы
+### Лёгкие альтернативы
 
-Для максимальной производительности рассмотрите эти легкие окружения рабочего стола (при установке с Minimal ISO):
+Для максимальной производительности рассмотрите эти лёгкие окружения рабочего стола (при установке с минимального iso):
 
-- **Sway** - Композитор тайлинга на основе Wayland (у меня 700МБ в простое)
-- **i3** - Тайлинговый оконный менеджер X11 (600МБ в простое)
-- **Hyprland** - Современный композитор Wayland с анимациями (900МБ в простое)
-- **XFCE** - Легкий традиционный рабочий стол
-- **LXQt** - Легкий рабочий стол на основе Qt
+- **Sway** - Тайловый композитор на базе Wayland (у меня 700mb в idle)
+- **i3** - Тайловый оконный менеджер X11 (600mb в idle)
+- **Hyprland** - Современный Wayland-композитор с анимациями (900mb в idle)
+- **XFCE** - Лёгкий традиционный рабочий стол
+- **LXQt** - Лёгкий рабочий стол на базе Qt
 
-**KDE Plasma Edition (НОВОЕ в Fedora 42):**
+**Редакция KDE Plasma:**
 KDE Plasma теперь официальная редакция Fedora наряду с Workstation (GNOME). 
 Это означает лучшую интеграцию, поддержку и оптимизацию из коробки.
 
-### Специфические улучшения Fedora 42
-
-**Что нового для производительности:**
-- Обновленные драйверы Mesa для лучшей графики AMD/Intel
-- Улучшенная производительность композитора Wayland
-- Лучшие настройки управления питанием по умолчанию
-- Улучшенная поддержка контейнеров
-
-**Игровые улучшения Fedora 42:**
-- Лучшая совместимость с режимом Steam Deck
-- Улучшенная интеграция Proton
-- Подготовка улучшенной поддержки HDR
-
 ### Управление питанием ноутбука
 
-**Установить инструменты оптимизации питания:**
+**Установка инструментов оптимизации питания:**
 ```bash
 sudo dnf install powertop tlp tlp-rdw
 
 sudo systemctl enable --now tlp
 
-# Настроить TLP для игрового/производительного режима
+# Настройка TLP для режима игр/производительности
 
 sudo nano /etc/tlp.conf
 
@@ -1663,46 +1690,48 @@ sudo nano /etc/tlp.conf
 
 ### Продвинутое управление памятью
 
-**Настроить поведение подкачки:**
+**Настройка поведения свопа:**
 ```bash
-# Уменьшить swappiness для лучшей игровой производительности
-echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+# Снижение swappiness для лучшей производительности
+echo 'vm.swappiness=150' | sudo tee -a /etc/sysctl.conf
 
-# Улучшить выделение памяти для игр
+# Улучшение распределения памяти для игр и т.д.
 echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
 ```
 
-**Раздел контейнерных/Flatpak игр**
+**Раздел гейминга в контейнерах/Flatpak**
 
-### Оптимизация контейнерных игр
+
+### Оптимизация гейминга в контейнерах
 
 **Оптимизация Steam Flatpak:**
 ```bash
-# Установить Steam как Flatpak для лучшей изоляции
+# Установка Steam как Flatpak для изоляции
 flatpak install com.valvesoftware.Steam
 
-# Предоставить необходимые разрешения для игр
+# Предоставление необходимых разрешений для игр
 flatpak override --user --filesystem=~/.local/share/Steam com.valvesoftware.Steam
 ```
 
-### Оптимизации GNOME
 
-Если остаетесь с GNOME:
+### Оптимизация GNOME
+
+Если остаётесь с GNOME:
 
 ```bash
-# Установить инструменты GNOME
+# Установка GNOME tweaks
 sudo dnf install gnome-tweaks gnome-extensions-app
 
-# Отключить анимации для лучшей производительности
+# Можете отключить анимации для лучшей производительности
 gsettings set org.gnome.desktop.interface enable-animations false
 
-# Уменьшить использование ресурсов
+# Снижение использования ресурсов
 gsettings set org.gnome.shell.overrides workspaces-only-on-primary false
 ```
 
 -----
 
-## 🖥️ Оптимизация графических драйверов
+## Оптимизация графических драйверов
 
 <details>
 <summary>🔴 Оптимизация графики AMD</summary>
@@ -1713,40 +1742,41 @@ gsettings set org.gnome.shell.overrides workspaces-only-on-primary false
 # Драйверы Mesa включены по умолчанию, убедитесь в последней версии
 sudo dnf install mesa-vulkan-drivers mesa-vdpau-drivers mesa-va-drivers
 
-# Установить ROCm для вычислений (опционально)
+# Установка ROCm для вычислений (опционально)
 sudo dnf install rocm-opencl rocm-smi
 ```
 
-### Настройки производительности AMD
+### Твики производительности AMD
 
 ```bash
-# Создать конфигурацию оптимизации AMD GPU
-cat << 'EOF' | sudo tee /etc/environment.d/99-amd-gaming.conf
-# Включить потоки GPU
+## Опционально! Некоторые из этих твиков могут снизить ваш fps или сделать игры нестабильными!
+# Проверяйте производительность и стабильность игр после внесения любых изменений
+
+sudo nano /etc/environment.d/99-amd-gaming.conf
+# Включение потоковости GPU (действительно хорошая опция для minecraft, но может снизить fps в большинстве игр)
 mesa_glthread=true
 
-# Оптимизации RadeonSI
+# Оптимизации RadeonSI (иногда драйвер radv работает хуже mesa. тестируйте всё!)
 RADV_PERFTEST=gpl,nggc,sam,rt
 AMD_VULKAN_ICD=RADV
 
-# Ускорение видео
+# Аппаратное ускорение видео
 VDPAU_DRIVER=radeonsi
 LIBVA_DRIVER_NAME=radeonsi
 
-# Включить изменяемый BAR
+# Включение Resizable BAR (если по какой-то причине rebar у вас не работает)
 AMD_GPU_ALLOW_RESIZE_BAR=1
-EOF
 ```
 
 ### Управление питанием AMD GPU
 
 ```bash
-# Установить режим производительности (в терминале):
+# Установка режима производительности (в терминале):
 echo "performance" | sudo tee /sys/class/drm/card*/device/power_dpm_state
 echo "high" | sudo tee /sys/class/drm/card*/device/power_profile
 
-# Создать постоянную службу
-cat << 'EOF' | sudo tee /etc/systemd/system/amd-gpu-performance.service
+# Создание постоянного сервиса
+sudo nano /etc/systemd/system/amd-gpu-performance.service
 [Unit]
 Description=AMD GPU Performance Mode
 After=multi-user.target
@@ -1759,20 +1789,35 @@ RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
-EOF
 
 sudo systemctl enable --now amd-gpu-performance.service
 ```
 
-### Разгон памяти AMD (продвинутый, не пытайтесь делать это без опыта)
+    
+### Включение AMD User Queues (специфично для RDNA 3/4)
+Позволяет игре напрямую общаться с GPU, обходя накладные расходы ядра
+Или можете просто добавить это в параметры запуска игры в Steam
 
 ```bash
-# Проверить текущую частоту памяти
-cat /sys/class/drm/card*/device/pp_dpm_mclk
+AMD_USERQ=1
+```
 
-# Разогнать VRAM (пример, осторожно настраивайте значения)
-echo "manual" | sudo tee /sys/class/drm/card*/device/power_dpm_force_performance_level
-echo "3" | sudo tee /sys/class/drm/card*/device/pp_dpm_mclk
+
+### AMD Lact (как AMD Adrenalin в Windows, позволяет настраивать смещение mv, частоту памяти, управление мощностью, кривую вентиляторов и т.д.)
+
+```bash
+### Поскольку мы добавили `amdgpu.ppfeaturemask=0xffffffff` в GRUB, теперь можете использовать LACT для андервольта/разгона карты для стабильности и более высоких boost-частот!
+
+# Включение copr-репозитория:
+sudo dnf copr enable ilyaz/LACT
+
+# Установка пакета (альтернативные пакеты: lact-headless, lact-libadwaita):
+sudo dnf install lact
+
+# Включение сервиса:
+sudo systemctl enable --now lactd
+
+## Что касается пользователей rx9070xt, рекомендую начать с "Performance Level: Manual", смещение напряжения -70mv, заблокировать частоту памяти на 2714Mhz, установить Power Limit на 355W. Для андервольта установите PL на 260-270W.
 ```
 
 </details>
@@ -1780,51 +1825,46 @@ echo "3" | sudo tee /sys/class/drm/card*/device/pp_dpm_mclk
 <details>
 <summary>🟢 Оптимизация графики NVIDIA</summary>
 
-## 🎮 Оптимизация графики NVIDIA для Fedora 42 (Wayland)
+## Оптимизация графики NVIDIA для Fedora
 
-> **Комплексное руководство по оптимизации для GPU NVIDIA на Fedora 42 с дисплейным сервером Wayland**
+> **Комплексное руководство по оптимизации для GPU NVIDIA на Fedora с дисплейным сервером Wayland**
 
-### 📋 Системные требования NVIDIA
+### Системные требования NVIDIA
 
 **Поддерживаемые GPU:**
 
-- GTX 700/900/1000 серий и новее (Maxwell, Pascal, Turing, Ampere, Ada Lovelace, Blackwell)
-- RTX 20/30/40/50 серий с полной поддержкой функций
-- Карты Quadro и Tesla (профессиональные рабочие нагрузки)
+- GTX 700/900/1000 серии и новее (Maxwell, Pascal, Turing, Ampere, Ada Lovelace, Blackwell)
+- RTX 20/30/40/50 серии с полной поддержкой функций
 
 **Совместимость драйверов:**
 
-- **Рекомендуется:** Драйверы NVIDIA 575+ для оптимальной поддержки Wayland
-- **Минимум:** NVIDIA 570+ для стабильной функциональности Wayland
-- **Примечание:** Стек драйверов NVIDIA демонстрирует намного лучшую поддержку Wayland с последними драйверами
+- **Лучше всего:** Драйверы NVIDIA 590+ для оптимальной поддержки Wayland и производительности
+- **Примечание:** Стек драйверов NVIDIA значительно улучшил поддержку Wayland в последних версиях
 
 -----
 
-### 🔧 Установка драйвера NVIDIA (Fedora 42 Wayland)
+### Установка драйвера NVIDIA
 
-#### Метод 1: RPM Fusion (настоятельно рекомендуется)
+#### Метод 1: RPM Fusion (Настоятельно рекомендуется)
 
-RPM Fusion остается самым надежным методом для драйверов NVIDIA на Fedora 42. Этот подход обеспечивает правильную интеграцию с дисплейным сервером Wayland и системными обновлениями.
+RPM Fusion остаётся наиболее надёжным методом для драйверов NVIDIA на Fedora. Этот подход обеспечивает правильную интеграцию с дисплейным сервером Wayland и системными обновлениями.
 
 ```bash
-# Включить репозитории RPM Fusion (если еще не включены)
+# Включение репозиториев RPM Fusion (если ещё не включены)
 sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
 sudo dnf install https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
 
-# Обновить системные пакеты
+# Обновление системных пакетов
 sudo dnf update
 
-# Установить драйверы NVIDIA с поддержкой Wayland
+# Установка драйверов NVIDIA с поддержкой Wayland
 sudo dnf install akmod-nvidia xorg-x11-drv-nvidia-cuda
 
-# Установить 32-битные библиотеки совместимости (необходимо для Steam, Wine, игр)
+# Установка 32-битных библиотек совместимости (необходимо для Steam, Wine, игр)
 sudo dnf install xorg-x11-drv-nvidia-libs.i686
 
-# Установить утилиту настроек NVIDIA
+# Установка утилиты настроек NVIDIA
 sudo dnf install nvidia-settings
-
-# Установить дополнительные инструменты для мониторинга
-sudo dnf install nvidia-ml-py3
 ```
 
 #### Проверка после установки
@@ -1832,158 +1872,182 @@ sudo dnf install nvidia-ml-py3
 Понимание того, что говорит каждая команда, помогает убедиться, что ваша система правильно настроена для оптимальной производительности.
 
 ```bash
-# Проверить установку драйвера и версию
+# Проверка установки драйвера и версии
 nvidia-smi
-# Это должно показать ваш GPU, версию драйвера (575+) и текущее использование
+# Должна показать ваш GPU, версию драйвера (570+) и текущую загрузку
 
-# Подтвердить доступность поддержки CUDA
+# Подтверждение доступности поддержки CUDA
 nvidia-smi -q | grep "CUDA Version"
-# Необходимо для ИИ нагрузок и некоторых игр, использующих вычисления GPU
+# Необходимо для AI-нагрузок и некоторых игр, использующих GPU-вычисления
 
-# Проверить, что Wayland использует NVIDIA GPU
+# Проверка использования NVIDIA GPU в Wayland
 echo $XDG_SESSION_TYPE
-# Должно выводить "wayland" на Fedora 42
+# Должно вывести "wayland"
 
-# Проверить, что бэкенд GBM работает
+# Проверка работы GBM backend
 nvidia-smi --query-gpu=name,driver_version --format=csv
 # Подтверждает правильную загрузку драйвера
 ```
 
-#### Включение Wayland для NVIDIA (важный шаг)
+#### Включение Wayland для NVIDIA (Важный шаг)
 
-Wayland требует специальной конфигурации для правильной работы с драйверами NVIDIA. Этот шаг обеспечивает возможность вашего окружения рабочего стола использовать аппаратное ускорение.
+Wayland требует специальной настройки для правильной работы с драйверами NVIDIA. Этот шаг обеспечивает возможность вашего окружения рабочего стола использовать аппаратное ускорение.
 
 ```bash
-# Включить DRM kernel mode setting (требуется для Wayland)
+# Включение режима настройки ядра DRM (требуется для Wayland)
 echo 'options nvidia_drm modeset=1 fbdev=1' | sudo tee /etc/modprobe.d/nvidia-drm-modeset.conf
 
-# Включить раннюю загрузку модулей NVIDIA
+# Включение ранней загрузки модулей NVIDIA
 echo -e 'nvidia\nnvidia_modeset\nnvidia_uvm\nnvidia_drm' | sudo tee /etc/modules-load.d/nvidia.conf
 
-# Пересобрать initramfs для включения изменений
+# Пересборка initramfs для включения изменений
 sudo dracut --force
 
-# Перезагрузить для применения изменений модулей ядра
+# Перезагрузка для применения изменений модулей ядра
 sudo reboot
 ```
 
 -----
 
-### ⚡ Оптимизации производительности NVIDIA Wayland
+### Оптимизация производительности NVIDIA Wayland
 
 #### 1. Переменные окружения для Wayland
 
-Эти переменные окружения оптимизируют поведение GPU NVIDIA специально для композиторов Wayland. В отличие от X11, Wayland автоматически обрабатывает многие оптимизации, но эти переменные тонко настраивают производительность.
+Эти переменные окружения оптимизируют поведение NVIDIA GPU специально для композиторов Wayland. В отличие от X11, Wayland автоматически обрабатывает многие оптимизации, но эти переменные тонко настраивают производительность.
 
-Добавить в `/etc/environment`:
+Добавьте в `/etc/environment`:
 
 ```bash
 # Основные оптимизации NVIDIA Wayland
+#
+# Критическое предупреждение для современных NVIDIA GPU (RTX 20 серии и новее)
+#
+# На основе отзывов пользователей и тестирования, следующие две переменные окружения (`GBM_BACKEND` и `__GLX_VENDOR_LIBRARY_NAME`) могут вызывать серьёзные системные задержки ввода, фризы и неотзывчивость приложений на NVIDIA RTX 20, 30, 40 и 50 серий
+#
+# ! Рекомендация для RTX 20-серии и новее: НЕ используйте эти переменные. Современные драйверы nvidia и wayland-композиторы обычно обрабатывают эту настройку автоматически. Их ручное включение может создать конфликты
+# ! Рекомендация для старых gpu (GTX 10-серии и старше): Эти переменные всё ещё могут быть полезны для обеспечения совместимости wayland на старом железе. можете попробовать их. любой отчёт о проблеме с конкретной gpu будет очень ценным! :)
+#
+#
+# Только для старых карт (GTX 10-серии и ниже), вам может понадобиться:
 GBM_BACKEND=nvidia-drm
 __GLX_VENDOR_LIBRARY_NAME=nvidia
-
-# ВАЖНО: __GL_THREADED_OPTIMIZATIONS может вызвать чёрный экран на некоторых RTX-картах
-# Рекомендуется выставлять эту опцию только для отдельных игр, а не глобально.
-# Если вы всё же добавили её в /etc/environment и получили чёрный экран — выполните следующие шаги.
-
-# 1. Переключитесь в TTY:
-#    - Нажмите Ctrl+Alt+F3 (можно F2–F6) — появится экран для входа.
-#    - Введите свой логин и пароль.
-
-# 2. Откройте файл /etc/environment для редактирования и удалите строку:
-sudo nano /etc/environment
-
-#    Найдите строку:
+#
+# Включение потоковых оптимизаций (улучшает параллелизм CPU-GPU)
+__GL_THREADED_OPTIMIZATIONS=1
+# Предупреждение: Опция __GL_THREADED_OPTIMIZATIONS может вызывать чёрные экраны на некоторых RTX-картах (См. раздел решения проблем NVIDIA Wayland)
+# Установите это для каждой игры отдельно (см. раздел решения проблем)
+# Или протестируйте и установите для окружения, если столкнётесь с чёрным экраном - войдите через tty, удалите __GL_THREADED_OPTIMIZATION=1 из /etc/environment, сохраните и перезагрузитесь.
+# краткий гайд по tty
+#    - нажмите Ctrl+Alt+F3 (или F2–F6) для переключения на экран входа TTY.
+#    - войдите с вашим именем пользователя и паролем.
+#
+# 2. отредактируйте /etc/environment и удалите проблемную строку:
+# sudo nano /etc/environment
+#    - найдите строку:
 #        __GL_THREADED_OPTIMIZATIONS=1
-#    Удалите её, затем сохраните (Ctrl+O, Enter) и выйдите (Ctrl+X).
+#    - удалите её, затем сохраните (Ctrl+O, Enter) и выйдите (Ctrl+X).
+#
+# 3. перезагрузите систему:
+# sudo reboot
+# Кстати, всё равно рекомендуется устанавливать эту опцию только для каждой игры отдельно
+# Спасибо @lemonadeforlife за указание на эту проблему и решение
 
-# 3. Перезагрузите систему:
-sudo reboot
-
-# Кэширование компиляции шейдеров (сокращает время загрузки)
+# Кэширование компиляции шейдеров (уменьшает фризы в играх)
 __GL_SHADER_DISK_CACHE=1
 __GL_SHADER_DISK_CACHE_PATH=/tmp/nvidia-shader-cache
 __GL_SHADER_DISK_CACHE_SIZE=1073741824
 
-# Отключить VSync для игр (снижает задержку ввода)
+# Отключение VSync для игр (уменьшает задержку ввода)
 __GL_SYNC_TO_VBLANK=0
 
-# Включить неофициальные расширения протокола (совместимость)
+# Включение неофициальных расширений протокола для совместимости с Wayland
 __GL_ALLOW_UNOFFICIAL_PROTOCOL=1
 
-# Специфические оптимизации Wayland
+# Оптимизации для игр
+# Включает NVAPI для функций типа DLSS в Proton, пользователи rtx gpu протестируйте это пожалуйста
+PROTON_ENABLE_NVAPI=1
+NVIDIA_DRIVER_CAPABILITIES=all
+
+# Хорошие флаги для каждой игры в Steam/PortProton/Lutris и т.д., найденные на reddit и используемые сообществом
+PROTON_ENABLE_WAYLAND=1
+LD_PRELOAD=""
+__GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
+%command%
+-fullscreen;
+
+# Следующие твики не рекомендуются глобально. Используйте их только если знаете, что они вам нужны.
+
+# ТОЛЬКО для композиторов wl-roots (Sway, Hyprland)
+# Это может помочь с графическими глюками, но не нужно и не рекомендуется на GNOME/KDE.
 WLR_DRM_NO_ATOMIC=1
 WLR_NO_HARDWARE_CURSORS=1
-
-# Игровые оптимизации
-NVIDIA_DRIVER_CAPABILITIES=all
-PROTON_ENABLE_NVAPI=1
 ```
 
-#### 2. Параметры модулей ядра
+#### 2. Параметры модулей ядра (используйте если знаете что делаете)
 
-Современные драйверы NVIDIA получают преимущества от специфических параметров ядра, которые улучшают совместимость с Wayland и производительность.
+Современные драйверы NVIDIA выигрывают от специфических параметров ядра, которые могут улучшить производительность
+Тестируйте каждую опцию, работает ли она в вашем случае и с вашим железом
 
-Создать `/etc/modprobe.d/nvidia-power-management.conf`:
+Создайте `/etc/modprobe.d/nvidia-power-management.conf`:
 
 ```bash
-# Включить современные функции управления питанием
+# Включение современных функций управления питанием
 options nvidia NVreg_DynamicPowerManagement=0x02
 
-# Включить Page Attribute Table (улучшает производительность памяти)
+# Включение таблицы атрибутов страниц (улучшает производительность памяти)
 options nvidia NVreg_UsePageAttributeTable=1
 
-# Включить поддержку ResizableBAR (серии RTX 30/40/50)
+# Включение поддержки ResizableBAR (RTX 30/40/50 серии)
 options nvidia NVreg_EnableResizableBar=1
 
-# Сохранить видеопамять во время приостановки
+# Сохранение видеопамяти во время suspend
 options nvidia NVreg_PreserveVideoMemoryAllocations=1
 
-# Включить операции потоковой памяти (требуется для некоторых нагрузок)
+# Включение операций потоковой памяти (требуется для некоторых нагрузок)
 options nvidia NVreg_EnableStreamMemOPs=1
 ```
 
 #### 3. Специфические настройки GNOME Wayland
 
-GNOME на Wayland требует особого внимания для достижения оптимальной производительности NVIDIA. Эти настройки решают общие проблемы с композитором GNOME.
+GNOME на Wayland требует особого внимания для достижения оптимальной производительности NVIDIA. Эти настройки решают распространённые проблемы с композитором GNOME.
 
 ```bash
-# Включить ускорение NVIDIA для сессии GNOME Wayland
+# Включение ускорения NVIDIA для сессии GNOME Wayland
 gsettings set org.gnome.mutter experimental-features "['variable-refresh-rate']"
 
-# Настроить GNOME для игровой производительности
+# Настройка GNOME для игровой производительности
 gsettings set org.gnome.shell.extensions.dash-to-dock click-action 'cycle-windows'
 gsettings set org.gnome.desktop.interface enable-animations false
 
-# Установить коэффициент масштабирования для дисплеев высокой плотности (настройте по необходимости)
+# Установка масштаба для high-DPI дисплеев (настройте по необходимости)
 gsettings set org.gnome.desktop.interface scaling-factor 1
 ```
 
-#### 4. Конфигурация KDE Plasma Wayland
+#### 4. Настройка KDE Plasma Wayland
 
 KDE Plasma имеет отличную поддержку Wayland и особенно хорошо работает с драйверами NVIDIA при правильной настройке.
 
 ```bash
-# Включить поддержку переменной частоты обновления
-kwriteconfig5 --file kwinrc --group Compositing --key VariableRefreshRate true
+# Включение поддержки переменной частоты обновления (или используя настройки kde, что лучше)
+kwriteconfig6 --file kwinrc --group Compositing --key VariableRefreshRate true
 
-# Оптимизировать настройки композитора для игр
-kwriteconfig5 --file kwinrc --group Compositing --key LatencyPolicy Low
-kwriteconfig5 --file kwinrc --group Compositing --key RenderTimeEstimator 1
+# Оптимизация настроек композитора для игр
+kwriteconfig6 --file kwinrc --group Compositing --key LatencyPolicy Low
+kwriteconfig6 --file kwinrc --group Compositing --key RenderTimeEstimator 1
 
-# Перезапустить KWin для применения изменений
+# Перезапуск KWin для применения изменений
 qdbus org.kde.KWin /KWin reconfigure
 ```
 
 -----
 
-### 🏎️ Специфические игровые оптимизации NVIDIA
+### Специфические оптимизации NVIDIA для игр
 
 #### 1. Параметры запуска Steam для Wayland
 
-Игры Steam на Wayland требуют специфических параметров запуска, чтобы обеспечить правильное использование GPU NVIDIA и достичь оптимальной производительности.
+Игры в Steam на Wayland требуют специфических параметров запуска для обеспечения правильного использования NVIDIA GPU и достижения оптимальной производительности.
 
-**Для нативных Linux игр:**
+**Для нативных Linux-игр:**
 
 ```bash
 # Базовая оптимизация с GameMode
@@ -1993,45 +2057,45 @@ gamemoderun __GL_THREADED_OPTIMIZATIONS=1 %command%
 gamemoderun __GL_SYNC_TO_VBLANK=0 __GL_THREADED_OPTIMIZATIONS=1 %command%
 ```
 
-**Для игр Proton/Wine:**
+**Для Proton/Wine игр:**
 
 ```bash
 # Стандартная оптимизация Proton
-gamemoderun __GL_THREADED_OPTIMIZATIONS=1 PROTON_ENABLE_NVAPI=1 %command%
+gamemoderun __GL_THREADED_OPTIMIZATIONS=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
 
-# Продвинутая оптимизация с асинхронной компиляцией DXVK
-gamemoderun __GL_THREADED_OPTIMIZATIONS=1 DXVK_ASYNC=1 PROTON_ENABLE_NVAPI=1 %command%
+# Продвинутая оптимизация с асинхронной компиляцией dxvk/gpl
+gamemoderun __GL_THREADED_OPTIMIZATIONS=1 DXVK_ASYNC=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
 
 # Для игр, требующих максимальной производительности
-gamemoderun __GL_SYNC_TO_VBLANK=0 __GL_THREADED_OPTIMIZATIONS=1 DXVK_ASYNC=1 PROTON_ENABLE_NVAPI=1 %command%
+gamemoderun __GL_SYNC_TO_VBLANK=0 __GL_THREADED_OPTIMIZATIONS=1 DXVK_ASYNC=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
 ```
 
-#### 2. Игровая оптимизация Lutris
+#### 2. Оптимизация игр в Lutris
 
 Lutris обеспечивает отличную интеграцию с драйверами NVIDIA на Wayland. Настройте эти параметры для оптимальной игровой производительности.
 
 ```bash
-# Установить Lutris с поддержкой NVIDIA
+# Установка Lutris с поддержкой NVIDIA
 sudo dnf install lutris wine
 
-# Настроить переменные окружения Lutris (в настройках Lutris)
-# Добавить в System Options → Environment variables:
+# Настройка переменных окружения Lutris (в настройках Lutris)
+# Добавьте это в Системные опции → Переменные окружения:
 __GL_THREADED_OPTIMIZATIONS=1
 __GL_SHADER_DISK_CACHE=1
 PROTON_ENABLE_NVAPI=1
-DXVK_HUD=fps,memory,gpuload
+__GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
 ```
 
 #### 3. Интеграция GameMode
 
-GameMode автоматически оптимизирует производительность системы во время игровых сессий, обеспечивая лучшее распределение ресурсов и сниженную задержку.
+GameMode автоматически применяет системные оптимизации во время игры. Хотя он хорошо работает из коробки, вы можете тонко настроить его поведение.
 
 ```bash
-# Установить GameMode
+# Установка GameMode
 sudo dnf install gamemode
 
-# Настроить GameMode для оптимизации NVIDIA
-sudo tee /etc/gamemode.ini << 'EOF'
+# Настройка GameMode для оптимизации NVIDIA
+sudo nano /etc/gamemode.ini
 [general]
 renice=10
 ioprio=1
@@ -2039,273 +2103,175 @@ ioprio=1
 [gpu]
 apply_gpu_optimisations=accept-responsibility
 gpu_device=0
-amd_performance_level=high
-
-[custom]
-start=nvidia-smi -pm 1 && nvidia-smi -pl 300
-end=nvidia-smi -pm 0 && nvidia-smi -ac -r
-EOF
 ```
 
 -----
 
-### 🔥 Продвинутые настройки NVIDIA Wayland
+### Продвинутые твики NVIDIA Wayland
 
 #### 1. Поддержка переменной частоты обновления (VRR)
 
 Современные драйверы NVIDIA поддерживают переменную частоту обновления на Wayland, обеспечивая более плавный игровой опыт с совместимыми мониторами.
 
 ```bash
-# Включить VRR в GNOME (требует GNOME 45+)
+# Включение VRR в GNOME
 gsettings set org.gnome.mutter experimental-features "['variable-refresh-rate']"
+# Или в настройках дисплея (если поддерживается)
 
-# Для KDE Plasma включить в системных настройках или через команду:
-kwriteconfig5 --file kwinrc --group Compositing --key VariableRefreshRate true
-
-# Проверить, что VRR работает
+# Проверка работы VRR
 sudo dnf install drm_info
 drm_info | grep -i vrr
 ```
 
-#### 2. Поддержка HDR (экспериментальная)
+#### 2. Поддержка HDR (Экспериментальная)
 
 Поддержка расширенного динамического диапазона постепенно улучшается на Wayland с драйверами NVIDIA. Эти настройки включают экспериментальную функциональность HDR.
 
 ```bash
-# Включить поддержку HDR (требует совместимый дисплей и свежие драйверы)
+# Включение поддержки HDR (требуется совместимый дисплей и последние драйверы)
 echo 'options nvidia NVreg_EnableHDR=1' | sudo tee /etc/modprobe.d/nvidia-hdr.conf
 
-# Поддержка HDR в GNOME (экспериментальная, GNOME 46+)
+# Поддержка HDR в GNOME (экспериментально!)
 gsettings set org.gnome.mutter experimental-features "['variable-refresh-rate','hdr']"
 ```
 
 #### 3. Мониторинг и настройка производительности
 
-Эффективный мониторинг производительности помогает выявить узкие места и проверить, что оптимизации работают правильно.
+Эффективный мониторинг производительности помогает выявлять узкие места и проверять, что оптимизации работают правильно.
 
 ```bash
-# Установить инструменты мониторинга
+# Установка инструментов мониторинга
 sudo dnf install nvtop mangohud goverlay
 
-# Создать скрипт мониторинга для игровых сессий
-sudo tee /usr/local/bin/nvidia-gaming-monitor.sh << 'EOF'
+# Создание скрипта мониторинга для игровых сессий
+sudo nano /usr/local/bin/nvidia-monitor.sh
 #!/bin/bash
-echo "=== Монитор игровой производительности NVIDIA ==="
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
-echo "Драйвер: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader)"
-echo "=== Статистика в реальном времени ==="
+echo "Driver: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader)"
 nvidia-smi dmon -s pucvmet
-EOF
 
-sudo chmod +x /usr/local/bin/nvidia-gaming-monitor.sh
+sudo chmod +x /usr/local/bin/nvidia-monitor.sh
 ```
 
 -----
 
-### 🛡️ Управление питанием и тепловая оптимизация
+### Управление питанием и термооптимизация
 
-#### 1. Продвинутое управление питанием
+#### Продвинутое управление питанием (применяйте только если знаете что делаете)
 
-Правильное управление питанием обеспечивает стабильную производительность, предотвращая ненужное потребление энергии в периоды простоя.
+Правильное управление питанием обеспечивает стабильную производительность при предотвращении ненужного потребления энергии в простое.
 
 ```bash
-# Настроить продвинутое управление питанием
+# Настройка продвинутого управления питанием
 echo 'options nvidia NVreg_DynamicPowerManagement=0x02' | sudo tee -a /etc/modprobe.d/nvidia-power.conf
 
-# Включить runtime управление питанием для ноутбуков
-sudo tee /etc/udev/rules.d/80-nvidia-pm.rules << 'EOF'
-# Включить runtime PM для устройств NVIDIA VGA/3D контроллера
+# Включение runtime power management для ноутбуков
+sudo nano /etc/udev/rules.d/80-nvidia-pm.rules
+# Включение runtime PM для устройств NVIDIA VGA/3D контроллера
 SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", TEST=="power/control", ATTR{power/control}="auto"
 SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", TEST=="power/control", ATTR{power/control}="auto"
-EOF
-```
-
-#### 2. Тепловое управление
-
-Эффективное тепловое управление предотвращает троттлинг и поддерживает оптимальную производительность во время продолжительных игровых сессий.
-
-```bash
-# Установить инструменты теплового мониторинга
-sudo dnf install lm_sensors
-
-# Настроить обнаружение датчиков
-sudo sensors-detect --auto
-
-# Создать скрипт теплового мониторинга
-sudo tee /usr/local/bin/nvidia-thermal.sh << 'EOF'
-#!/bin/bash
-TEMP=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits)
-POWER=$(nvidia-smi --query-gpu=power.draw --format=csv,noheader,nounits)
-
-echo "Температура GPU: ${TEMP}°C"
-echo "Потребляемая мощность: ${POWER}Вт"
-
-# Предупредить, если температура высокая
-if [ $TEMP -gt 83 ]; then
-    echo "ВНИМАНИЕ: Высокая температура GPU!"
-    notify-send "Предупреждение о температуре GPU" "GPU работает при ${TEMP}°C"
-fi
-EOF
-
-sudo chmod +x /usr/local/bin/nvidia-thermal.sh
 ```
 
 -----
 
-### 🐛 Устранение неполадок NVIDIA Wayland
+### Решение проблем NVIDIA Wayland
 
-#### Общие проблемы и современные решения
+#### Распространённые проблемы и современные решения
 
 Понимание того, как диагностировать и решать проблемы, обеспечивает оптимальную производительность и стабильность системы.
 
 **1. Сессия Wayland не запускается с NVIDIA:**
 
-Это наиболее распространенная проблема при переходе с X11 на Wayland с драйверами NVIDIA.
+Это самая распространённая проблема при переходе с X11 на Wayland с драйверами NVIDIA.
 
 ```bash
-# Проверить правильность параметров модуля ядра
+### Чёрный экран NVIDIA при загрузке
+
+**Проблема:** Система показывает чёрный экран после загрузки с драйверами NVIDIA
+
+**Причина:** Переменная окружения `__GL_THREADED_OPTIMIZATIONS=1` в `/etc/environment` может вызывать проблемы с инициализацией дисплея на некоторых RTX GPU
+
+**Решение:**
+1. Загрузитесь в режим восстановления (удерживайте Shift во время загрузки для доступа к меню GRUB)
+2. Отредактируйте `/etc/environment` и удалите или закомментируйте:
+   ```bash
+   # __GL_THREADED_OPTIMIZATIONS=1
+
+# Проверьте правильность параметров модуля ядра
 cat /etc/modprobe.d/nvidia-drm-modeset.conf
 # Должно содержать: options nvidia_drm modeset=1 fbdev=1
 
-# Проверить, включен ли DRM modeset
+# Проверьте включён ли DRM modeset
 cat /sys/module/nvidia_drm/parameters/modeset
-# Должно выводить: Y
+# Должно вывести: Y
 
-# Пересобрать initramfs и перезагрузиться при необходимости
+# Пересоберите initramfs и перезагрузитесь при необходимости
 sudo dracut --force
 sudo reboot
 
-# Проверить сессию Wayland после перезагрузки
+# Проверьте сессию Wayland после перезагрузки
 echo $XDG_SESSION_TYPE
-# Должно выводить: wayland
+# Должно вывести: wayland
 ```
 
-**2. Плохая игровая производительность несмотря на хорошее оборудование:**
+**2. Плохая игровая производительность несмотря на хорошее железо:**
 
-Проблемы производительности часто связаны с неправильным использованием GPU или настройками управления питанием.
+Проблемы с производительностью часто связаны с неправильным использованием GPU или настройками управления питанием.
 
 ```bash
-# Проверить использование GPU
+# Проверьте используется ли GPU
 nvidia-smi dmon -s pucvmet -c 10
 
-# Проверить ограничения по питанию
+# Проверьте ограничение питания
 nvidia-smi --query-gpu=power.limit,power.draw --format=csv
-# Потребляемая мощность должна приближаться к лимиту мощности во время игр
+# Потребление энергии должно приближаться к лимиту во время игры
 
-# Мониторить частоты GPU во время игр
+# Мониторьте частоты GPU во время игры
 watch -n 1 'nvidia-smi --query-gpu=clocks.gr,clocks.mem --format=csv'
-# Частоты должны достигать максимальных значений во время игр
+# Частоты должны достигать максимальных значений во время игры
 ```
 
-**3. Разрывы экрана или заикания:**
+**3. Разрывы изображения или фризы:**
 
-Современные композиторы Wayland лучше справляются с разрывами, чем X11, но может потребоваться некоторая настройка.
+Современные композиторы Wayland лучше обрабатывают разрывы чем X11, но может потребоваться некоторая настройка.
 
 ```bash
-# Для GNOME убедиться, что VRR включен
+# Для GNOME убедитесь что VRR включён
 gsettings get org.gnome.mutter experimental-features
 # Должно включать 'variable-refresh-rate'
 
-# Для игр отключить VSync в игре и использовать VSync композитора
-# Добавить в параметры запуска Steam:
+# Для игр отключите VSync в игре и используйте VSync композитора
+# Добавьте в параметры запуска Steam:
 __GL_SYNC_TO_VBLANK=0 %command%
 ```
 
 **4. Высокое потребление энергии в простое:**
 
-Предотвращение ненужного потребления энергии во время простоя улучшает время работы батареи и снижает тепловыделение.
+Предотвращение ненужного потребления энергии в простое улучшает время работы от батареи и снижает нагрев.
 
 ```bash
-# Включить runtime управление питанием
+# Включение runtime power management
 echo 'auto' | sudo tee /sys/bus/pci/devices/0000:*/power/control
 
-# Проверить, что управление питанием работает
+# Проверка работы управления питанием
 cat /sys/bus/pci/devices/0000:*/power/runtime_status
 # Должно показывать 'suspended' для простаивающего GPU
 
-# Мониторить потребление энергии в простое
+# Мониторинг потребления энергии в простое
 nvidia-smi --query-gpu=power.draw --format=csv --loop=1
 ```
 
 -----
 
-### 🔧 Инструменты разработчика и ИИ NVIDIA
-
-#### Среда разработки CUDA
-
-Правильная настройка CUDA обеспечивает совместимость с фреймворками ИИ и инструментами разработки.
-
-```bash
-# Установить CUDA toolkit
-sudo dnf install cuda-toolkit cuda-devel cuda-runtime
-
-# Настроить переменные окружения
-echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
-echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
-echo 'export CUDA_HOME=/usr/local/cuda' >> ~/.bashrc
-
-# Перезагрузить окружение
-source ~/.bashrc
-
-# Проверить установку CUDA
-nvcc --version
-nvidia-smi --query-gpu=compute_cap --format=csv
-```
-
-#### Поддержка контейнеров для рабочих нагрузок ИИ/МО
-
-Поддержка контейнеров обеспечивает легкое развертывание приложений искусственного интеллекта и машинного обучения.
-
-```bash
-# Установить NVIDIA Container Toolkit
-curl -fsSL https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo | \
-  sudo tee /etc/yum.repos.d/nvidia-container-toolkit.repo
-
-sudo dnf install nvidia-container-toolkit
-
-# Настроить Docker/Podman
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
-
-# Протестировать поддержку контейнеров
-sudo docker run --rm --gpus all nvidia/cuda:12.3-runtime-ubuntu20.04 nvidia-smi
-```
-
------
-
-### 📊 Мониторинг производительности и бенчмаркинг
+### Мониторинг производительности и бенчмаркинг
 
 #### Комплексная настройка мониторинга
 
-Эффективный мониторинг помогает оптимизировать производительность и выявлять потенциальные проблемы до того, как они повлияют на игровую или рабочую производительность.
+Эффективный мониторинг помогает оптимизировать производительность и выявлять потенциальные проблемы до того, как они повлияют на игры или работу.
 
 ```bash
-# Установить комплексный набор для мониторинга
+# Установка комплексного пакета мониторинга
 sudo dnf install nvtop btop mangohud goverlay
-
-# Создать скрипт мониторинга производительности
-sudo tee /usr/local/bin/nvidia-perf-monitor.sh << 'EOF'
-#!/bin/bash
-clear
-echo "=== Монитор производительности NVIDIA ==="
-echo "Система: $(hostnamectl --static) | $(date)"
-echo "Драйвер: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader)"
-echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
-echo ""
-
-# Использование GPU и памяти
-nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,clocks.gr,clocks.mem --format=csv
-
-echo ""
-echo "=== Активные процессы GPU ==="
-nvidia-smi pmon -c 1
-
-echo ""
-echo "Нажмите Ctrl+C для выхода из непрерывного мониторинга..."
-watch -n 2 nvidia-smi
-EOF
-
-sudo chmod +x /usr/local/bin/nvidia-perf-monitor.sh
 ```
 
 #### Игровой оверлей производительности
@@ -2313,10 +2279,10 @@ sudo chmod +x /usr/local/bin/nvidia-perf-monitor.sh
 MangoHud предоставляет метрики производительности в реальном времени во время игровых сессий.
 
 ```bash
-# Настроить MangoHud для оптимального отображения
+# Настройка MangoHud для оптимального отображения
 mkdir -p ~/.config/MangoHud
 
-cat > ~/.config/MangoHud/MangoHud.conf << 'EOF'
+nano ~/.config/MangoHud/MangoHud.conf
 # Информация о GPU и CPU
 gpu_stats
 cpu_stats
@@ -2337,25 +2303,23 @@ position=top-left
 font_size=22
 alpha=0.8
 
-# Ограничить логирование для предотвращения влияния на производительность
+# Ограничение логирования для предотвращения влияния на производительность
 log_duration=60
-EOF
 ```
 
 -----
 
-### 📚 Дополнительные ресурсы
+### Дополнительные ресурсы
 
 **Официальная документация NVIDIA:**
-- [Руководство по установке драйвера NVIDIA для Linux](https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/index.html)
+- [Руководство по установке драйвера NVIDIA Linux](https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/index.html)
 - [Руководство по установке CUDA для Linux](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/)
 
-**Ресурсы специфичные для Fedora:**
-- [Руководство RPM Fusion по NVIDIA](https://rpmfusion.org/Howto/NVIDIA)
-- [Заметки о выпуске Fedora 42](https://fedoraproject.org/wiki/Releases/42/ChangeSet)
+**Ресурсы для Fedora:**
+- [Гайд по NVIDIA от RPM Fusion](https://rpmfusion.org/Howto/NVIDIA)
 
-**Wayland и игры:**
-- [Игры на Linux с NVIDIA](https://www.gamingonlinux.com/)
+**Wayland и гейминг:**
+- [Гейминг на Linux с NVIDIA](https://www.gamingonlinux.com/)
 - [Документация MangoHud](https://github.com/flightlessmango/MangoHud)
 
 -----
@@ -2364,16 +2328,16 @@ EOF
 
 -----
 
-## 🔍 Мониторинг и проверка
+## Мониторинг и проверка
 
 ### Инструменты мониторинга производительности
 
 ```bash
-# Установить полезные инструменты мониторинга
-sudo dnf install htop iotop powertop fastfetch
+# Установка инструмента мониторинга
+sudo dnf install btop
 
-# Для подробной информации о системе
-sudo dnf install hardinfo
+# Для детальной информации о системе
+sudo dnf install hardinfo2
 ```
 
 ### Инструменты бенчмаркинга
@@ -2388,13 +2352,13 @@ sudo dnf install sysbench stress-ng
 
 -----
 
-## 🚨 Устранение неполадок
+## Решение проблем
 
-### Распространенные проблемы
+### Распространённые проблемы
 
-**1. Проблемы загрузки после параметров ядра:**
+**1. Проблемы с загрузкой после параметров ядра:**
 
-- Загрузитесь с предыдущего ядра из меню GRUB
+- Загрузитесь с предыдущим ядром из меню GRUB
 - Удалите проблемные параметры из `/etc/default/grub`
 - Пересгенерируйте конфигурацию GRUB
 
@@ -2406,80 +2370,94 @@ sudo dnf install sysbench stress-ng
 **3. Регрессия производительности:**
 
 - Мониторьте системные ресурсы: `htop`, `iotop`
-- Проверьте тепловое троттлинг: `watch sensors`
-- Проверьте статус служб: `systemctl list-units --failed`
+- Проверьте термотроттлинг: `watch sensors`
+- Проверьте статус сервисов: `systemctl list-units --failed`
 
 ### Команды восстановления
 
 ```bash
-# Сбросить GRUB к настройкам по умолчанию
+# Сброс GRUB к значениям по умолчанию
 sudo grub2-mkconfig -o /boot/grub2/grub.cfg
 
-# Сбросить контекст SELinux (при повторном включении SELinux)
+# Сброс контекста SELinux (при повторном включении SELinux)
 sudo restorecon -R /
 
-# Проверить целостность системы
+# Проверка целостности системы
 sudo dnf check
 sudo rpm -Va
 ```
 
 -----
 
-## 📊 Ожидаемый прирост производительности
+## Ожидаемый прирост производительности
 
-На основе тестирования пользователи могут ожидать:
+На основе тестирования, пользователи могут ожидать:
 
-- **Время загрузки:** Улучшение на 15-30%
-- **Игровая производительность:** Увеличение FPS на 5-15%
-- **Отзывчивость системы:** Значительно сниженная задержка ввода
-- **Использование памяти:** Снижение использования ОЗУ в простое на 10-20%
-- **Производительность хранилища:** Улучшенная производительность SSD с trim
+- **Время загрузки:** Улучшение на 10-20%
+- **Игровая производительность:** Прирост FPS на 5-15%
+- **Отзывчивость системы:** Значительное снижение задержки ввода
+- **Использование памяти:** Снижение использования RAM в простое на 5-15%
+- **Производительность накопителя:** Улучшенная производительность SSD с trim
 
 -----
 
-## 🤝 Участие в проекте
+-----
+
+## Участие в разработке
 
 Нашли улучшения или есть предложения? Не стесняйтесь:
+
 - Открыть issue на GitHub
 - Отправить pull request
-- Поделиться результатами ваших оптимизаций
+- Поделиться результатами оптимизации
 
 -----
 
-## 📚 Дополнительные ресурсы
+## Дополнительные ресурсы
 
 - [Документация Fedora](https://docs.fedoraproject.org/)
 - [RPM Fusion](https://rpmfusion.org/)
 - [Ядро CachyOS](https://github.com/CachyOS/linux-cachyos)
 - [Ananicy-cpp](https://gitlab.com/ananicy-cpp/ananicy-cpp)
-- [Gaming on Linux](https://www.gamingonlinux.com/)
+- [Гейминг на Linux](https://www.gamingonlinux.com/)
 
 -----
 
-## ⚖️ Отказ от ответственности
+## Дисклеймер
 
-Данное руководство изменяет системные настройки, которые могут повлиять на стабильность и безопасность. Всегда:
+Это руководство изменяет системные настройки, которые могут повлиять на стабильность и безопасность. Всегда:
+
 - Создавайте резервные копии системы перед применением изменений
-- Тестируйте изменения сначала на некритических системах
 - Понимайте последствия каждого изменения
-- Держите носители восстановления под рукой
+- Держите под рукой носители для восстановления
 
-**Результаты производительности могут варьироваться** в зависимости от конфигурации оборудования и конкретных случаев использования.
-
------
-
-## 📝 История изменений
-
-- **v1.0** - Первоначальное комплексное руководство
-- **v1.1** - Добавлен раздел устранения неполадок и русский перевод
-- **v1.2** - Улучшено инструментами мониторинга и скриптами обслуживания
-- **v1.3** - Добавлены драйверы NVIDIA и руководство по производительности и многое другое
-- **v1.4** - Добавлен раздел настроек GPU AMD, исправлен некоторый текст и обновлен полный русский перевод
-- **v1.5** - Добавлен раздел "Быстрая навигация" для удобства использования.
+**Результаты производительности могут варьироваться** в зависимости от конфигурации железа и конкретных случаев использования.
 
 -----
 
-*Последнее обновление: Сентябрь 2025*
+<details>
+<summary>Список изменений</summary>
+ 
+- **v1.0** - Создание первоначального гайда
+- **v1.1** - Добавлен раздел решения проблем и русский перевод
+- **v1.2** - Улучшен инструментами мониторинга и разделом обслуживания
+- **v1.3** - Добавлены драйверы NVIDIA, гайд по производительности и многое другое
+- **v1.4** - Добавлен раздел твиков для AMD gpu
+- **v1.5** - Добавлен раздел быстрой навигации для лучшей юзабилити
+- **v1.6** - Изменено с UKSMD на KSMD, более глубокое описание настройки ядра cachyos
+- **v1.7** - Обновлено с большим количеством nvidia флагов, исправлениями, подготовка к релизу Fedora 43
+- **v1.8** - Обновлены почти все разделы гайда, особенно на базе AMD для ещё большего прироста производительности
+</details>
+
+-----
+
+## English Version
+
+[Click here for the English version](github.md)
+
+-----
+
+*Последнее обновление: Январь 2026*
 </details>
 
 -----
@@ -2509,7 +2487,6 @@ Found improvements or have suggestions? Feel free to:
 This guide modifies system settings that may affect stability and security. Always:
 
 - Create system backups before applying changes
-- Test changes on non-critical systems first
 - Understand the implications of each modification
 - Keep recovery media accessible
 
@@ -2517,17 +2494,20 @@ This guide modifies system settings that may affect stability and security. Alwa
 
 -----
 
-## 📝 Changelog
-
-- **v1.0** - Initial comprehensive guide
+<details>
+<summary>Changelog</summary>
+ 
+- **v1.0** - Initial guide creation
 - **v1.1** - Added troubleshooting section and Russian translation
-- **v1.2** - Enhanced with monitoring tools and maintenance scripts
-- **v1.3** - Added NVIDIA drivers and performance guide and more
-- **v1.4** - Added AMD gpu tweaks section, corrected some text and updated full Russian translation
+- **v1.2** - Enhanced with monitoring tools and maintenance section
+- **v1.3** - Added NVIDIA drivers, performance guide and more
+- **v1.4** - Added AMD gpu tweaks section
 - **v1.5** - Added a Quick Navigation section for better usability
-- **v1.6** - Changed from UKSMD to KSMD, more deeper cachyos kernel settings, etc
+- **v1.6** - Changed from UKSMD to KSMD, more deeper cachyos kernel setup description
 - **v1.7** - Updated with more nvidia flags, corrections, preparing for Fedora 43 release
+- **v1.8** - Updated almost every guide section for even more performance gain, especially AMD based
+</details>
 
 -----
 
-*Last updated: December 2025*
+*Last updated: January 2026*
