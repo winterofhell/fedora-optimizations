@@ -165,7 +165,7 @@ sudo systemctl enable --now scx_loader
 
 # Step 3: Verify the Change
 dbus-send --system --print-reply --dest=org.scx.Loader /org/scx/Loader org.freedesktop.DBus.Properties.Get string:org.scx.Loader string:CurrentScheduler
-# the output should show string "scx_bpfland".
+# the output should show string "scx_lavd".
 
 ```
 
@@ -286,6 +286,7 @@ yourusername soft nofile 1048576
 
 ### IRQ Balance (Intel iGPU Users)
 
+Do NOT enable this if you already enabled scx_lavd!
 If experiencing performance issues with Intel integrated graphics:
 
 ```bash
@@ -413,13 +414,13 @@ MANGOHUD_CONFIG="fps_limit=277,no_display” mangohud LD_PRELOAD="" AMD_USERQ=1 
 
 **For games without hdr, BUT if you want auto SDR to HDR (like Auto HDR on windows)**
 ```bash
-MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --hdr-itm-enable --hdr-itm-target-nits 1000 --hdr-sdr-content-nits 203 --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
+MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --hdr-itm-enabled --hdr-itm-target-nits 1000 --hdr-sdr-content-nits 203 --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
 ```
 
 ## Auto sdr to hdr convertation
 --hdr-enabled: **Initializes the HDR pipeline. Without this, the other flags do nothing.**
 
---hdr-itm-enable: **Inverse Tone Mapping. This is the "Auto HDR" switch. It expands the color range of SDR games to use your OLED/ips full capabilities.**
+--hdr-itm-enabled: **Inverse Tone Mapping. This is the "Auto HDR" switch. It expands the color range of SDR games to use your OLED/ips full capabilities.**
 
 --hdr-itm-target-nits 1000: **Peak Brightness. Tells the algorithm your monitor hits 1000 nits. This ensures bright effects (sun, fire, magic) actually hit max brightness without clipping details.**
 
