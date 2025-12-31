@@ -219,7 +219,7 @@ zswap.enabled=0:  **Disables ZSWAP to lower latency. (Only do this if you have 3
 
 pci=pcie_bus_perf:  **Forces PCIe bus to max payload size (Maximum GPU/NVMe bandwidth).**
 
-pcie_aspm.policy=performance:  **Disables PCIe power saving states. Fixes idle latency spikes. (its basically better then pcie_aspm=off)!**
+pcie_aspm.policy=performance:  **Disables PCIe power saving states. Fixes idle latency spikes. (its basically better than pcie_aspm=off)!**
 
 usbcore.autosuspend=-1:  **Prevents USB devices from sleeping. Fixes "wake up" lag.**
 
@@ -408,13 +408,13 @@ How it works: **The scale is 0 to 20, where 0 is Maximum Sharpening and 20 is Le
 
 **For games without HDR:**
 ```bash
-MANGOHUD_CONFIG="fps_limit=277,no_display” mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 280 --force-grab-cursor --adaptive-sync —sharpness 2 -f -- %command%
+MANGOHUD_CONFIG="fps_limit=277,no_display” mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --force-grab-cursor --adaptive-sync —sharpness 2 -f -- %command%
 ```
 
 
 **For games without hdr, BUT if you want auto SDR to HDR (like Auto HDR on windows)**
 ```bash
-MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --hdr-itm-enabled --hdr-itm-target-nits 1000 --hdr-sdr-content-nits 203 --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
+MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --hdr-itm-enabled --hdr-itm-target-nits 1000 --hdr-sdr-content-nits 203 --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
 ```
 
 ## Auto sdr to hdr convertation
@@ -574,7 +574,7 @@ sudo nano /etc/environment.d/99-amd-gaming.conf
 # Enable GPU Threading (its a really good option for minecraft, but may lower your fps in most of games)
 mesa_glthread=true
 
-# RadeonSI optimizations (somethimes radv driver works worse than mesa. test everything!)
+# RadeonSI optimizations (only if needed!)
 RADV_PERFTEST=gpl,nggc,sam,rt
 AMD_VULKAN_ICD=RADV
 
@@ -607,6 +607,7 @@ RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
+
 
 sudo systemctl enable --now amd-gpu-performance.service
 ```
