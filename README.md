@@ -148,7 +148,7 @@ sudo dnf install cachyos-settings cachyos-ksm-settings scx-scheds
 sudo nano /etc/scx_loader/config.toml
 
 # Set the lavd scheduler as default and configure it for gaming mode.
-default_sched = "scx_bpfland"
+default_sched = "scx_lavd"
 default_mode = "Gaming"
  
 [scheds.scx_lavd]
@@ -361,7 +361,7 @@ If you installed the **CachyOS Kernel**, you have access to NTSync and FSR4 feat
 
 **For Native HDR Games (Cyberpunk, Elden Ring, etc):**
 ```bash
-MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 277 --hdr-enabled --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
+MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
 ```
 ## Environment Variables & Wrappers
 
@@ -403,6 +403,25 @@ How it works: **The scale is 0 to 20, where 0 is Maximum Sharpening and 20 is Le
 --: **The separator. It tells Gamescope "My settings stop here, the game command starts next."**
 
 %command%: **Steam automatically replaces this with the actual game executable.**
+
+**For games without HDR:**
+'''bash
+MANGOHUD_CONFIG="fps_limit=277,no_display” mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 280 --force-grab-cursor --adaptive-sync —sharpness 2 -f -- %command%
+'''
+
+**For games without hdr, BUT if you want auto SDR to HDR (like Auto HDR on windows)
+'''bash
+MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --hdr-itm-enable --hdr-itm-target-nits 1000 --hdr-sdr-content-nits 203 --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
+'''
+
+## Auto sdr to hdr convertation
+--hdr-enabled: **Initializes the HDR pipeline. Without this, the other flags do nothing.**
+
+--hdr-itm-enable: **Inverse Tone Mapping. This is the "Auto HDR" switch. It expands the color range of SDR games to use your OLED/ips full capabilities.**
+
+--hdr-itm-target-nits 1000: **Peak Brightness. Tells the algorithm your monitor hits 1000 nits. This ensures bright effects (sun, fire, magic) actually hit max brightness without clipping details.**
+
+--hdr-sdr-content-nits 203: **Base Brightness (paper white). Sets the brightness for standard textures and UI. 203 is the industry standard. If you set this too high, menus will blind you; too low, and the game looks dim...**
 
 -----
 
@@ -2448,12 +2467,6 @@ sudo rpm -Va
 - **v1.7** - Обновлено с большим количеством nvidia флагов, исправлениями, подготовка к релизу Fedora 43
 - **v1.8** - Обновлены почти все разделы гайда, особенно на базе AMD для ещё большего прироста производительности
 </details>
-
------
-
-## English Version
-
-[Click here for the English version](github.md)
 
 -----
 
