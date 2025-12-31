@@ -404,15 +404,17 @@ How it works: **The scale is 0 to 20, where 0 is Maximum Sharpening and 20 is Le
 
 %command%: **Steam automatically replaces this with the actual game executable.**
 
-**For games without HDR:**
-'''bash
-MANGOHUD_CONFIG="fps_limit=277,no_display” mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 280 --force-grab-cursor --adaptive-sync —sharpness 2 -f -- %command%
-'''
 
-**For games without hdr, BUT if you want auto SDR to HDR (like Auto HDR on windows)
-'''bash
+**For games without HDR:**
+```bash
+MANGOHUD_CONFIG="fps_limit=277,no_display” mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 280 --force-grab-cursor --adaptive-sync —sharpness 2 -f -- %command%
+```
+
+
+**For games without hdr, BUT if you want auto SDR to HDR (like Auto HDR on windows)**
+```bash
 MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 game-performance gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --hdr-itm-enable --hdr-itm-target-nits 1000 --hdr-sdr-content-nits 203 --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
-'''
+```
 
 ## Auto sdr to hdr convertation
 --hdr-enabled: **Initializes the HDR pipeline. Without this, the other flags do nothing.**
