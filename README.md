@@ -15,10 +15,10 @@
 
 **Testing Environment:**
 
-- **Period:** October 14, 2024 - December 31, 2025
-- **Distribution:** Fedora 43
+- **Period:** October 14, 2024 - March 15, 2026
+- **Distribution:** Fedora 43 / 44 beta
 - **Additional Testing:** NVIDIA and AMD gpu systems
-- **These optimizations may also work on any other distro, but i cannot guarantee it. It is always necessary to test everything. About 90% of these tweaks work on Arch and NixOS :)**
+- **These optimizations may also work on any other distro, but i cannot guarantee it. It is always necessary to test everything. About 80% of these tweaks work on Arch and NixOS :)**
 
 **Hardware Configurations (tested on):**
 
@@ -228,7 +228,7 @@ usbcore.autosuspend=-1:  **Prevents USB devices from sleeping. Fixes "wake up" l
 
 Good for: **Older CPUs (Zen 1/2/3, Intel 9th gen and older).** ~3% fps gain.
 
-Bad for: **Zen 4 / Zen 5 (Ryzen 7000/9000).** Can actually lower 1% low FPS due to branch prediction logic. **Zen 4 users should NOT use this!**
+Bad for: **Zen 4 / Zen 5 (Ryzen 7000/9000).** Can actually lower 1% low FPS due to branch prediction logic. **Zen 4 and 5 users should NOT use this!**
 
 ### Update GRUB Configuration
 
@@ -242,7 +242,7 @@ sudo grub2-mkconfig -o /boot/grub2/grub.cfg
 
 ### Memory Management
 
-**Enable systemd-oomd (Out-of-Memory Daemon):**
+**Enable systemd-oomd (Out-of-Memory Daemon)(but for games, it may be actually a bad tweak, depends on a system):**
 
 ```bash
 sudo systemctl enable --now systemd-oomd
@@ -286,8 +286,8 @@ yourusername soft nofile 1048576
 
 ### IRQ Balance (Intel iGPU Users)
 
-Do NOT enable this if you already enabled scx_lavd!
 If experiencing performance issues with Intel integrated graphics:
+(Do NOT enable this if you already enabled scx_lavd!)
 
 ```bash
 # Check status
@@ -362,7 +362,7 @@ If you installed the **CachyOS Kernel**, you have access to NTSync and FSR4 feat
 
 **For Native HDR Games (Cyberpunk, Elden Ring, etc):**
 ```bash
-MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
+MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_USE_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --force-grab-cursor --adaptive-sync -f -- %command%
 ```
 ## Environment Variables & Wrappers
 
@@ -376,15 +376,15 @@ mangohud: **Actually injects the HUD layer. Without this, the config above does 
 
 LD_PRELOAD="": **this fixes Steam stuttering issues after playing for like 25-30+ minutes**
 
-AMD_USERQ=1: **(RDNA 3/4 Only) Enables User Queues. Lets the game talk directly to the GPU hardware queues, bypassing some kernel driver overhead. Basically free CPU performance.**
+AMD_USERQ=1: **(RDNA 3/4 Only) Enables User Queues. Lets the game talk directly to the GPU hardware queues, bypassing some kernel driver overhead. Basically free cpu performance.**
 
-PROTON_NTSYNC=1: **(Requires CachyOS Kernel) Replaces the old fsync/esync emulation with a proper kernel-level driver for Windows threading. Massively reduces CPU overhead in complex games.**
+PROTON_USE_NTSYNC=1: **Replaces the old fsync/esync emulation with a proper kernel level driver for Windows threading. Massively reduces cpu overhead in some games.**
 
 gamemoderun: **Just a feral gamemode option**
 
 ## Gamescope Arguments (The Container)
 
-gamescope: **Valve's micro-compositor. It isolates the game window from your desktop, fixing Alt-Tab crashes and handling resolution/HDR perfectly.**
+gamescope: **Valve's micro-compositor. It isolates the game window from your desktop, often fixing alt+tab crashes and handling resolution/HDR perfectly.**
 
 -W 2560 -H 1440: **Sets the internal resolution the game thinks it is running at. Set this to your monitor's native resolution (like 1920x1080 etc)**
 
@@ -396,9 +396,6 @@ gamescope: **Valve's micro-compositor. It isolates the game window from your des
 
 --adaptive-sync: **Explicitly enables VRR (FreeSync/G-Sync) inside the container so you don't get screen tearing**
 
---sharpness 2: **Applies a high-quality CAS sharpening filter.**
-How it works: **The scale is 0 to 20, where 0 is Maximum Sharpening and 20 is Least Sharpening. A value of 2 provides a very crisp, detailed image.**
-
 -f: **Forces the container to display in Fullscreen mode.**
 
 --: **The separator. It tells Gamescope "My settings stop here, the game command starts next."**
@@ -408,13 +405,13 @@ How it works: **The scale is 0 to 20, where 0 is Maximum Sharpening and 20 is Le
 
 **For games without HDR:**
 ```bash
-MANGOHUD_CONFIG="fps_limit=277,no_display” mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --force-grab-cursor --adaptive-sync —sharpness 2 -f -- %command%
+MANGOHUD_CONFIG="fps_limit=277,no_display” mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_USE_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --force-grab-cursor --adaptive-sync -f -- %command%
 ```
 
 
 **For games without hdr, BUT if you want auto SDR to HDR (like Auto HDR on windows)**
 ```bash
-MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --hdr-itm-enabled --hdr-itm-target-nits 1000 --hdr-sdr-content-nits 203 --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
+MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_USE_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --hdr-itm-enabled --hdr-itm-target-nits 1000 --hdr-sdr-content-nits 203 --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
 ```
 
 ## Auto sdr to hdr convertation
@@ -636,7 +633,7 @@ sudo dnf install lact
 # Enable the service:
 sudo systemctl enable --now lactd
 
-## As for rx9070xt users, i recommend to start with "Performance Level: Manual", -70mv voltage offset, lock your memory clock on 2714Mhz, set Power Limit to 355W. For undervolt, set PL to 260-270W.
+## As for rx9070xt users, i recommend to start with "Performance Level: Manual", -70mv voltage offset, lock your memory clock on 2750Mhz, set Power Limit to 355W(for overclock, +3-4% fps). For undervolt, set PL to 260-270W(-3% fps).
 ```
 
 </details>
@@ -657,7 +654,7 @@ sudo systemctl enable --now lactd
 
 **Driver Compatibility:**
 
-- **Best:** NVIDIA 590+ drivers for optimal Wayland support and performance
+- **Best:** NVIDIA 595+ drivers for optimal Wayland support and performance
 - **Note:** NVIDIA driver stack is seeing much better Wayland support with its latest drivers
 
 -----
@@ -693,7 +690,7 @@ Understanding what each command tells us helps ensure your system is properly co
 ```bash
 # Verify driver installation and check version
 nvidia-smi
-# This should show your GPU, driver version (570+), and current utilization
+# This should show your GPU, driver version (595+), and current utilization
 
 # Confirm CUDA support is available
 nvidia-smi -q | grep "CUDA Version"
