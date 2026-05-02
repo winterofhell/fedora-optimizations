@@ -1,6 +1,6 @@
-# Fedora Linux 43 Performance & Gaming Optimization Guide
+# Fedora Linux 44 Performance & Gaming Optimization Guide
 
-> **Complete guide for optimizing Fedora 43 for maximum performance, gaming, general use, etc | by winterofhell**
+> **Complete guide for optimizing Fedora 44 for maximum performance, gaming, general use, etc | by winterofhell**
 
 ## Quick Navigation
 
@@ -15,8 +15,8 @@
 
 **Testing Environment:**
 
-- **Period:** October 14, 2024 - March 15, 2026
-- **Distribution:** Fedora 43 / 44 beta
+- **Period:** October 14, 2024 - May 2, 2026
+- **Distribution:** Fedora 44
 - **Additional Testing:** NVIDIA and AMD gpu systems
 - **These optimizations may also work on any other distro, but i cannot guarantee it. It is always necessary to test everything. About 80% of these tweaks work on Arch and NixOS :)**
 
@@ -1222,9 +1222,9 @@ Based on testing, users can expect:
 <details>
 <summary>👀 Нажмите для просмотра русской версии</summary>
     
-# Гайд по оптимизации производительности и гейминга Fedora Linux 43
+# Гайд по оптимизации производительности и гейминга Fedora Linux 44
 
-> **Полное руководство по оптимизации Fedora 43 для максимальной производительности, гейминга, повседневного использования и т.д. | от winterofhell**
+> **Полное руководство по оптимизации Fedora 44 для максимальной производительности, гейминга, повседневного использования и т.д. | от winterofhell**
 
 ## Быстрая навигация
 
@@ -1240,7 +1240,7 @@ Based on testing, users can expect:
 **Тестовое окружение:**
 
 - **Период:** 14 октября 2024 - 31 декабря 2025
-- **Дистрибутив:** Fedora 43
+- **Дистрибутив:** Fedora 44
 - **Дополнительное тестирование:** Системы с NVIDIA и AMD видеокартами
 - **Эти оптимизации могут работать и на других дистрибутивах, но я не могу этого гарантировать. Всегда необходимо всё тестировать. Около 90% этих твиков работают на Arch и NixOS :)**
 
@@ -2465,7 +2465,7 @@ sudo rpm -Va
 - **v1.4** - Добавлен раздел твиков для AMD gpu
 - **v1.5** - Добавлен раздел быстрой навигации для лучшей юзабилити
 - **v1.6** - Изменено с UKSMD на KSMD, более глубокое описание настройки ядра cachyos
-- **v1.7** - Обновлено с большим количеством nvidia флагов, исправлениями, подготовка к релизу Fedora 43
+- **v1.7** - Обновлено с большим количеством nvidia флагов, исправлениями, подготовка к релизу Fedora 44
 - **v1.8** - Обновлены почти все разделы гайда, особенно на базе AMD для ещё большего прироста производительности
 </details>
 
@@ -2524,4 +2524,4 @@ This guide modifies system settings that may affect stability and security. Alwa
 
 -----
 
-*Last updated: January 2026*
+*Last updated: May 2026*
