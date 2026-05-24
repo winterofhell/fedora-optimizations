@@ -15,16 +15,16 @@
 
 **Testing Environment:**
 
-- **Period:** October 14, 2024 - May 2, 2026
+- **Period:** October 14, 2024 - May 24, 2026
 - **Distribution:** Fedora 44
 - **Additional Testing:** NVIDIA and AMD gpu systems
-- **These optimizations may also work on any other distro, but i cannot guarantee it. It is always necessary to test everything. About 80% of these tweaks work on Arch and NixOS :)**
+- **These optimizations may also work on any other distro, but i cannot guarantee it. It is always necessary to test everything. About 90% of these tweaks work on Arch and NixOS (tested by myself) :)**
 
 **Hardware Configurations (tested on):**
 
-- **First:** Ryzen 5 5500U, 20GB DDR4, RX550X/RX Vega 7, NVMe
+- **First:** Ryzen 5 5500U, 20GB DDR4, RX550X/RX Vega 7, Nvme ssd
 - **Second:** Ryzen 5 5600, 16GB DDR4, GTX 1060, SATA SSD
-- **Third:** Ryzen 5 7500f, 32Gb DDR5, RX 9070 XT, Nvme
+- **Third:** Ryzen 5 7500f / 7 9850x3d, 32Gb DDR5, RX 9070 XT, Nvme ssd
 
 -----
 
@@ -114,60 +114,79 @@ sudo dnf install kernel-cachyos-lts kernel-cachyos-lts-devel-matched
 
 Ananicy-cpp automatically manages process priorities and reduces system latency:
 
-```bash
 # Install build dependencies
+```bash
 sudo dnf group install "Development Tools"
 sudo dnf install cmake systemd-devel spdlog-devel fmt-devel nlohmann-json-devel make automake gcc gcc-c++
+```
 
 # Clone and build
+```bash
 git clone https://gitlab.com/ananicy-cpp/ananicy-cpp.git
 cd ananicy-cpp
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j$(nproc)
 sudo make install
+```
 
 # Enable service
+```bash
 sudo systemctl enable --now ananicy-cpp
+```
 
-### Leveraging Automated CachyOS Tweaks
+# Leveraging Automated CachyOS Tweaks
 
-# The CachyOS team provides powerful packages that can automate many of the advanced tweaks. This is a simpler and safer approach than manually setting dozens of system variables :)
+#### The CachyOS team provides powerful packages that can automate many of the advanced tweaks. This is a simpler and safer approach than manually setting dozens of system variables :)
 
 # 1. Install CachyOS Optimization Packages
+```bash
 sudo dnf install cachyos-settings cachyos-ksm-settings scx-scheds
+```
 
 # 2. Advanced CPU Scheduler Optimization (SCX)
-# This is one of the most impactful tweaks for system responsiveness and gaming performance. We will replace the default Linux CPU scheduler with a specialized one from the `scx-scheds` package we installed earlier.
-# Note: This is an advanced tweak. While it provides significant gains, it changes a core component of the system !!
+### This is one of the most impactful tweaks for system responsiveness and gaming performance. We will replace the default Linux CPU scheduler with a specialized one from the `scx-scheds` package we installed earlier.
+#### Note: This is an advanced tweak. While it provides significant gains, it changes a core component of the system !!
 
-# Step 1: Configure the Default Scheduler
-# We will set `scx_lavd` as our default scheduler. It is currently the best scheduler for gaming latency
-# on modern cpus, as it prioritizes critical game threads over background noise.
+# Configure the Default Scheduler
+### We will set `scx_lavd` as our default scheduler. It is currently the best scheduler for gaming latency
+#### on modern cpus, as it prioritizes critical game threads over background noise
 
+**Step 1 — Open the config file:**
+```bash
 sudo nano /etc/scx_loader/config.toml
+```
 
-# Set the lavd scheduler as default and configure it for gaming mode.
+**Step 2 — Paste this configuration:**
+```toml
 default_sched = "scx_lavd"
 default_mode = "Gaming"
- 
+
 [scheds.scx_lavd]
 auto_mode = ["--performance"]
 gaming_mode = ["-m", "performance"]
-
-### Important: Disable IRQBalance
-# If you are using `scx_scheds`, you MUST disable `irqbalance`. It fights with the scheduler causing micro-stutters.
-
-sudo systemctl disable --now irqbalance
-
-# Step 2: Enable and Start the Scheduler Service
-sudo systemctl enable --now scx_loader
-
-# Step 3: Verify the Change
-dbus-send --system --print-reply --dest=org.scx.Loader /org/scx/Loader org.freedesktop.DBus.Properties.Get string:org.scx.Loader string:CurrentScheduler
-# the output should show string "scx_lavd".
-
 ```
+
+> `scx_lavd` is currently the best scheduler for gaming latency on modern CPUs — it prioritizes critical game threads over background tasks.
+
+> **Important:** If you enable `scx_scheds`, you **must** disable `irqbalance`, they conflict and cause micro-stutters.
+
+```bash
+sudo systemctl disable --now irqbalance
+```
+
+**Step 3 — Enable and start the scheduler:**
+```bash
+sudo systemctl enable --now scx_loader
+```
+
+**Step 4 — Verify it's running:**
+```bash
+dbus-send --system --print-reply --dest=org.scx.Loader /org/scx/Loader \
+  org.freedesktop.DBus.Properties.Get string:org.scx.Loader string:CurrentScheduler
+# Output should show: string "scx_lavd"
+```
+
 
 ### Service Management
 
@@ -205,26 +224,25 @@ Add these parameters to `GRUB_CMDLINE_LINUX`:
 ```bash
 GRUB_CMDLINE_LINUX="quiet splash amdgpu.ppfeaturemask=0xffffffff split_lock_detect=off amd_pstate=active page_alloc.shuffle=1 pci=pcie_bus_perf pcie_aspm.policy=performance usbcore.autosuspend=-1 nowatchdog nmi_watchdog=0 zswap.enabled=0"
 ```
-### Parameter Breakdown:
+### Parameter Breakdown
 
-amd_pstate=active: **CRITICAL for Zen 3/4/5. Enables the EPP driver for millisecond-speed clock boosting. (Intel users: remove this).**
+| Parameter | Effect | Notes |
+|---|---|---|
+| `amd_pstate=active` | Enables the EPP driver for millisecond-speed clock boosting | **AMD Zen 3/4/5 only** — Intel users remove this |
+| `amdgpu.ppfeaturemask=0xffffffff` | Unlocks voltage control and overclocking limits | Required for LACT / CoreCtrl. **AMD GPU only** |
+| `split_lock_detect=off` | Prevents SIGBUS crashes and stutters in games that use split locks (anti-cheat commonly does this) | Safe for everyone |
+| `nowatchdog` + `nmi_watchdog=0` | Disables CPU watchdog timers — reduces micro-stutter | Safe for everyone |
+| `zswap.enabled=0` | Disables ZSWAP to lower latency | **Only if you have 32 GB+ RAM.** Remove this if you have 4–16 GB |
+| `pci=pcie_bus_perf` | Forces PCIe bus to maximum payload size for peak GPU/NVMe bandwidth | Safe for everyone |
+| `pcie_aspm.policy=performance` | Disables PCIe power saving states, fixes idle latency spikes | Better than `pcie_aspm=off` |
+| `usbcore.autosuspend=-1` | Prevents USB devices from sleeping — fixes input "wake-up" lag | Safe for everyone |
+| `page_alloc.shuffle=1` | Randomizes free-list order to improve average-case cache performance | Safe for everyone |
 
-amdgpu.ppfeaturemask=0xffffffff:  **CRITICAL for AMD GPU. Unlocks voltage control and overclocking limits (essential for LACT/CoreCtrl).**
+### Experimental — Use at your own risk
 
-split_lock_detect=off:  **Prevents SIGBUS crashes and stutters in games that use "split locks" (anti-cheat often does this).**
-
-nowatchdog & nmi_watchdog=0:  **Disables CPU cycle-wasting watchdog timers. Reduces micro-stutter.**
-
-zswap.enabled=0:  **Disables ZSWAP to lower latency. (Only do this if you have 32GB+ RAM. If you have 4-16GB, remove this).**
-
-pci=pcie_bus_perf:  **Forces PCIe bus to max payload size (Maximum GPU/NVMe bandwidth).**
-
-pcie_aspm.policy=performance:  **Disables PCIe power saving states. Fixes idle latency spikes. (its basically better than pcie_aspm=off)!**
-
-usbcore.autosuspend=-1:  **Prevents USB devices from sleeping. Fixes "wake up" lag.**
-
-## Experimental (Use at your own risk):
-**mitigations=off: Disables CPU security patches.**
+| Parameter | Benefit | Warning |
+|---|---|---|
+| `mitigations=off` | ~3% FPS gain by disabling CPU security patches | **Do NOT use on Zen 4 / Zen 5 (Ryzen 7000/9000)** — can actually lower 1% lows due to branch prediction changes. Recommended only for Zen 1/2/3 and Intel 9th gen or older |
 
 Good for: **Older CPUs (Zen 1/2/3, Intel 9th gen and older).** ~3% fps gain.
 
@@ -360,68 +378,75 @@ sudo dnf install portproton
 
 If you installed the **CachyOS Kernel**, you have access to NTSync and FSR4 features (amd rdna 4 (rx90**) gpus).
 
-**For Native HDR Games (Cyberpunk, Elden Ring, etc):**
+## Launch Command Reference
+
+### Which command should I use?
+
+| My situation | Command to use |
+|---|---|
+| Game has native HDR (Cyberpunk, Elden Ring…) | HDR command |
+| Game has no HDR, I don't want fake HDR | No-HDR command |
+| Game has no HDR, I want Auto HDR (like Windows) | SDR→HDR command |
+
+---
+
+### Environment Variables & Wrappers
+
+| Variable | What it does |
+|---|---|
+| `MANGOHUD_CONFIG="fps_limit=277,no_display"` | Configures MangoHud silently — the frame limiter runs in the background with no visible overlay |
+| `fps_limit=277` | Manual low-latency cap: take your monitor's max Hz and subtract 3 (e.g. 280 Hz → 277). Keeps frames inside your FreeSync range and prevents V-Sync input lag backpressure |
+| `mangohud` | Actually injects the limiter layer — without this prefix, the config above does nothing |
+| `LD_PRELOAD=""` | Fixes Steam micro-stutters that appear after ~25–30 minutes of play |
+| `AMD_USERQ=1` | **(RDNA 3/4 only)** Enables User Queues — lets the game talk directly to GPU hardware queues, bypassing kernel driver overhead. Essentially free CPU performance |
+| `PROTON_USE_NTSYNC=1` | Replaces fsync/esync Windows thread emulation with a proper kernel level driver. Significantly reduces cpu overhead in multi-threaded games. **On Fedora 44, the NTSYNC module loads automatically when Steam or Wine is installed** |
+| `gamemoderun` | Activates Feral GameMode optimizations for the duration of the game session |
+
+### Gamescope Arguments
+
+| Argument | What it does |
+|---|---|
+| `gamescope` | Valves micro-compositor, isolates the game window from your desktop, often fixing alt+tab crashes and handling HDR/resolution cleanly |
+| `-W 2560 -H 1440` | Internal resolution the game thinks its running at — **set this to your monitor's native resolution** |
+| `-r 280` | Refresh rate cap for the Gamescope container — **match this exactly to your monitor's max Hz** (e.g. 144, 165, 280…) |
+| `--hdr-enabled` | Unlocks the HDR output pipeline — required for oled/ips monitors to actually enter HDR mode |
+| `--force-grab-cursor` | Prevents your mouse from accidentally clicking outside the game onto a second monitor |
+| `--adaptive-sync` | Explicitly enables VRR (FreeSync / G Sync) inside the container |
+| `--sharpness 2` | Applies CAS sharpening. Scale is **0 = sharpest, 20 = softest** — 2 gives a crisp, detailed image |
+| `-f` | Forces the container to display in fullscreen |
+| `--` | Separator — tells Gamescope "my flags end here, the game command starts next" |
+| `%command%` | Steam automatically replaces this with the actual game executable |
+
+### Auto SDR → HDR Arguments
+
+Only needed for the SDR to HDR command. These sit alongside `--hdr-enabled`:
+
+| Argument | What it does |
+|---|---|
+| `--hdr-itm-enabled` | Enables itm — the actual "Auto HDR" switch that expands SDR color range to use your display's full capabilities |
+| `--hdr-itm-target-nits 1000` | Peak brightness target in nits, set this to your monitor's rated peak. Ensures bright effects (fire, sun, magic) reach full brightness without clipping |
+| `--hdr-sdr-content-nits 203` | Paper-white / base brightness for standard textures and UI. 203 is the industry standard — too high blinds you in menus, too low makes the game look dim |
+
+---
+
+### Commands
+
+**Native HDR games (Cyberpunk, Elden Ring, any game with hdr support):**
 ```bash
 MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_USE_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --force-grab-cursor --adaptive-sync -f -- %command%
 ```
-## Environment Variables & Wrappers
 
-MANGOHUD_CONFIG="fps_limit=277,no_display": **This configures the MangoHud layer silently.**
-
-fps_limit=277: **This is your manual "low latency" mode(like amd antilag). Take your monitor's max Refresh Rate and subtract 3 (e.g., 280Hz - 3 = 277 FPS). This keeps the framerate strictly inside your FreeSync range, preventing V-Sync backpressure and minimizing input lag.**
-
-no_display: **Hides the overlay so you don't see the stats, but the limiter still works in the background.**
-
-mangohud: **Actually injects the HUD layer. Without this, the config above does nothing.**
-
-LD_PRELOAD="": **this fixes Steam stuttering issues after playing for like 25-30+ minutes**
-
-AMD_USERQ=1: **(RDNA 3/4 Only) Enables User Queues. Lets the game talk directly to the GPU hardware queues, bypassing some kernel driver overhead. Basically free cpu performance.**
-
-PROTON_USE_NTSYNC=1: **Replaces the old fsync/esync emulation with a proper kernel level driver for Windows threading. Massively reduces cpu overhead in some games.**
-
-gamemoderun: **Just a feral gamemode option**
-
-## Gamescope Arguments (The Container)
-
-gamescope: **Valve's micro-compositor. It isolates the game window from your desktop, often fixing alt+tab crashes and handling resolution/HDR perfectly.**
-
--W 2560 -H 1440: **Sets the internal resolution the game thinks it is running at. Set this to your monitor's native resolution (like 1920x1080 etc)**
-
--r 280: **Sets the refresh rate cap for the Gamescope container. Match this exactly to your monitor's max Hz (144hz, 180, 60, 100 etc).**
-
---hdr-enabled: **Unlocks HDR output. Essential for oled/ips to actually trigger HDR mode.**
-
---force-grab-cursor: **Prevents your mouse from accidentally clicking outside the game window onto a second monitor.**
-
---adaptive-sync: **Explicitly enables VRR (FreeSync/G-Sync) inside the container so you don't get screen tearing**
-
--f: **Forces the container to display in Fullscreen mode.**
-
---: **The separator. It tells Gamescope "My settings stop here, the game command starts next."**
-
-%command%: **Steam automatically replaces this with the actual game executable.**
-
-
-**For games without HDR:**
+**No HDR:**
 ```bash
-MANGOHUD_CONFIG="fps_limit=277,no_display” mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_USE_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --force-grab-cursor --adaptive-sync -f -- %command%
+MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_USE_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --force-grab-cursor --adaptive-sync -f -- %command%
 ```
 
-
-**For games without hdr, BUT if you want auto SDR to HDR (like Auto HDR on windows)**
+**No HDR + Auto SDR->HDR (like Windows auto HDR):**
 ```bash
 MANGOHUD_CONFIG="fps_limit=277,no_display" mangohud LD_PRELOAD="" AMD_USERQ=1 PROTON_USE_NTSYNC=1 gamemoderun gamescope -W 2560 -H 1440 -r 280 --hdr-enabled --hdr-itm-enabled --hdr-itm-target-nits 1000 --hdr-sdr-content-nits 203 --force-grab-cursor --adaptive-sync --sharpness 2 -f -- %command%
 ```
 
-## Auto sdr to hdr convertation
---hdr-enabled: **Initializes the HDR pipeline. Without this, the other flags do nothing.**
-
---hdr-itm-enabled: **Inverse Tone Mapping. This is the "Auto HDR" switch. It expands the color range of SDR games to use your OLED/ips full capabilities.**
-
---hdr-itm-target-nits 1000: **Peak Brightness. Tells the algorithm your monitor hits 1000 nits. This ensures bright effects (sun, fire, magic) actually hit max brightness without clipping details.**
-
---hdr-sdr-content-nits 203: **Base Brightness (paper white). Sets the brightness for standard textures and UI. 203 is the industry standard. If you set this too high, menus will blind you; too low, and the game looks dim...**
+> **Remember to adjust** `-W`, `-H`, and `-r` to match your monitors resolution and refresh rate
 
 -----
 
@@ -512,6 +537,19 @@ echo 'vm.swappiness=150' | sudo tee -a /etc/sysctl.conf
 
 # Improve memory allocation for gaming, etc.
 echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
+
+# Increase the maximum number of memory map areas a process can have.
+# The default value (`65530`) is too low for many modern games and will cause crashes or launch failures in titles like Hogwarts Legacy, cs2, The Finals, DayZ, and Star Citizen.
+
+echo 'vm.max_map_count=16777216' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+
+> This is one of the most commonly missing tweaks on fresh Linux installs. Fedora, Ubuntu, and Pop!_OS have all raised this default — if you're on a clean Fedora 44 install it may already be set, but it's worth verifying:
+> ```bash
+> sysctl vm.max_map_count
+> ```
+> If the output is `65530`, apply the fix above.
 ```
 
 **Container/Flatpak Gaming Section**
@@ -722,6 +760,7 @@ sudo dracut --force
 # Reboot to apply kernel module changes
 sudo reboot
 ```
+> **Fedora + RPM Fusion users:** This step is likely **not needed** — the `akmod-nvidia` package enables modeset automatically. Only apply this manually if Wayland fails to start after driver installation, or if you installed the driver via the official `.run` file instead of RPM Fusion.
 
 -----
 
@@ -740,32 +779,20 @@ Add to `/etc/environment`:
 #
 # Based on user feedback and testing, the following two env variables (`GBM_BACKEND` and `__GLX_VENDOR_LIBRARY_NAME`) can cause severe system-wide input lag, stuttering, and application unresponsiveness on NVIDIA RTX 20, 30, 40, and 50 series gpus
 #
-# ! Recommendation for RTX 20-series and newer: DO NOT use these variables. Modern nvidia drivers and wayland compositors generally handle this configuration automatically. Enabling them manually can create conflicts
-# ! Recommendation for older gpus (GTX 10-Series and older): These variables can still be beneficial for ensuring wayland compatibility on older hardware. you can try them. any issue report with a specific gpu problems will be very valuable! :)
-#
+# ! Recommendation for RTX 20-series and newer: DO NOT use these variables. Modern nvidia drivers and wayland compositors handle this automatically.
+# ! Recommendation for older gpus (GTX 10-Series and older): These variables can still be beneficial for ensuring wayland compatibility on older hardware.
 #
 # For older cards ONLY (GTX 10-Series and below), you might still need:
 GBM_BACKEND=nvidia-drm
 __GLX_VENDOR_LIBRARY_NAME=nvidia
-#
+
 # Enable threaded optimizations (improves CPU-GPU parallelism)
 __GL_THREADED_OPTIMIZATIONS=1
-# Warning: __GL_THREADED_OPTIMIZATIONS option can cause black screens on some RTX cards (See NVIDIA Wayland Troubleshooting)
-# Set this per-game instead (see troubleshooting section)
-# Or test and set it for environment, if you encounter a black screen - log in through tty, remove __GL_THREADED_OPTIMIZATION=1 from /etc/environment, save and reboot.
-# short tty guide
-#    - press Ctrl+Alt+F3 (or F2–F6) to switch to a TTY login screen.
-#    - log in with your username and password.
-#
-# 2. edit /etc/environment and remove the problematic line:
-# sudo nano /etc/environment
-#    - look for the line:
-#        __GL_THREADED_OPTIMIZATIONS=1
-#    - delete it, then save (Ctrl+O, Enter) and exit (Ctrl+X).
-#
-# 3. reboot your system:
-# sudo reboot
-# Btw it's still recommended to set this option only per game
+# Warning: can cause black screens on some RTX cards. Set this per-game instead (see troubleshooting section)
+# If you get a black screen after setting this globally:
+#    - press Ctrl+Alt+F3 to switch to TTY, log in
+#    - sudo nano /etc/environment, remove the line, save (Ctrl+O, Enter, Ctrl+X)
+#    - sudo reboot
 # Thanks to @lemonadeforlife for pointing out this problem and solution
 
 # Shader compilation caching (reduces stutter in games)
@@ -776,25 +803,22 @@ __GL_SHADER_DISK_CACHE_SIZE=1073741824
 # Disable VSync for gaming (reduces input lag)
 __GL_SYNC_TO_VBLANK=0
 
-# Enable unofficial protocol extensions for Wayland compatibility
-__GL_ALLOW_UNOFFICIAL_PROTOCOL=1
-
-# Gaming-specific optimizations
-# Enables NVAPI for features like DLSS in Proton, rtx gpu users test this please
+# Enables NVAPI for features like DLSS in Proton
 PROTON_ENABLE_NVAPI=1
-NVIDIA_DRIVER_CAPABILITIES=all
 
-# Good flags for every game on Steam/PortProton/Lutris etc found on reddit and used by community
+# Force Proton to use native Wayland rendering path
 PROTON_ENABLE_WAYLAND=1
+
+# Fixes Steam stuttering after 25-30+ minutes of play
 LD_PRELOAD=""
+
+# Skip shader cache cleanup on launch (prevents stutter spikes)
 __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
-%command%
--fullscreen;
 
-# The following tweaks are not recommended globally. Use them only if you know you need them.
-
-# For wl-roots compositors ONLY (Sway, Hyprland)
-# These may help with graphical glitches but are not needed and recommended on GNOME/KDE.
+# The following tweaks are not recommended globally.
+# For wl-roots compositors ONLY (Sway, Hyprland) — not needed on GNOME/KDE.
+# Note: with driver 595+ and Sway 1.11+ / Hyprland (explicit sync support),
+# WLR_NO_HARDWARE_CURSORS may no longer be necessary. Test without it first.
 WLR_DRM_NO_ATOMIC=1
 WLR_NO_HARDWARE_CURSORS=1
 ```
@@ -828,8 +852,14 @@ options nvidia NVreg_EnableStreamMemOPs=1
 GNOME on Wayland requires particular attention to achieve optimal NVIDIA performance. These settings address common issues with the GNOME compositor.
 
 ```bash
-# Enable NVIDIA acceleration for GNOME Wayland session
+Enable Variable Refresh Rate (VRR):
+
+# Fedora 44 with GNOME 50: VRR is now stable — enable it directly in Settings → Displays
+# Or via command line:
 gsettings set org.gnome.mutter experimental-features "['variable-refresh-rate']"
+```
+
+> **Fedora 44 note:** With GNOME 50, VRR is no longer experimental. You can enable it directly in **Settings → Displays → Variable Refresh Rate** without any gsettings command. The command above still works but is no longer required.
 
 # Configure GNOME for gaming performance
 gsettings set org.gnome.shell.extensions.dash-to-dock click-action 'cycle-windows'
@@ -844,7 +874,7 @@ gsettings set org.gnome.desktop.interface scaling-factor 1
 KDE Plasma has excellent Wayland support and works particularly well with NVIDIA drivers when properly configured.
 
 ```bash
-# Enable variable refresh rate support (or using kde settings which is better)
+# Enable variable refresh rate support (or using kde/gnome settings which is better)
 kwriteconfig6 --file kwinrc --group Compositing --key VariableRefreshRate true
 
 # Optimize compositor settings for gaming
@@ -879,11 +909,11 @@ gamemoderun __GL_SYNC_TO_VBLANK=0 __GL_THREADED_OPTIMIZATIONS=1 %command%
 # Standard Proton optimization
 gamemoderun __GL_THREADED_OPTIMIZATIONS=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
 
-# Advanced optimization with dxvk async/gpl compilation
-gamemoderun __GL_THREADED_OPTIMIZATIONS=1 DXVK_ASYNC=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
+# Advanced optimization with GPL pipeline compilation (replaces old dxvk-async)
+gamemoderun __GL_THREADED_OPTIMIZATIONS=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
 
 # For games requiring maximum performance
-gamemoderun __GL_SYNC_TO_VBLANK=0 __GL_THREADED_OPTIMIZATIONS=1 DXVK_ASYNC=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
+gamemoderun __GL_SYNC_TO_VBLANK=0 __GL_THREADED_OPTIMIZATIONS=1 PROTON_ENABLE_NVAPI=1 LD_PRELOAD="" __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1 %command%
 ```
 
 #### 2. Lutris Gaming Optimization
@@ -914,9 +944,10 @@ sudo dnf install gamemode
 sudo nano /etc/gamemode.ini
 [general]
 renice=10
-ioprio=1
+ioprio=0
 
 [gpu]
+# Warning: attempts to overclock GPU via nvidia-settings. Test carefully.
 apply_gpu_optimisations=accept-responsibility
 gpu_device=0
 ```
@@ -944,11 +975,8 @@ drm_info | grep -i vrr
 High Dynamic Range support is gradually improving on Wayland with NVIDIA drivers. These settings enable experimental HDR functionality.
 
 ```bash
-# Enable HDR support (requires compatible display and recent drivers)
+# Unverified parameter — test before applying, not in official NVIDIA docs
 echo 'options nvidia NVreg_EnableHDR=1' | sudo tee /etc/modprobe.d/nvidia-hdr.conf
-
-# GNOME HDR support (experimental!)
-gsettings set org.gnome.mutter experimental-features "['variable-refresh-rate','hdr']"
 ```
 
 #### 3. Performance Monitoring and Tuning
@@ -2510,7 +2538,7 @@ This guide modifies system settings that may affect stability and security. Alwa
 
 <details>
 <summary>Changelog</summary>
- 
+
 - **v1.0** - Initial guide creation
 - **v1.1** - Added troubleshooting section and Russian translation
 - **v1.2** - Enhanced with monitoring tools and maintenance section
@@ -2520,6 +2548,8 @@ This guide modifies system settings that may affect stability and security. Alwa
 - **v1.6** - Changed from UKSMD to KSMD, more deeper cachyos kernel setup description
 - **v1.7** - Updated with more nvidia flags, corrections, preparing for Fedora 43 release
 - **v1.8** - Updated almost every guide section for even more performance gain, especially AMD based
+- **v1.9** - More detailed info, also updated for Fedora 44
+
 </details>
 
 -----
