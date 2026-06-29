@@ -15,7 +15,7 @@
 
 **Testing Environment:**
 
-- **Period:** October 14, 2024 - May 24, 2026
+- **Period:** October 14, 2024 - June 29, 2026
 - **Distribution:** Fedora 44
 - **Additional Testing:** NVIDIA and AMD gpu systems
 - **These optimizations may also work on any other distro, but i cannot guarantee it. It is always necessary to test everything. About 90% of these tweaks work on Arch and NixOS (tested by myself) :)**
@@ -102,6 +102,34 @@ sudo dnf install kernel-cachyos kernel-cachyos-devel
 
 # For x86_64_v2 only (older CPUs):
 sudo dnf install kernel-cachyos-lts kernel-cachyos-lts-devel-matched
+```
+
+### Make CachyOS Kernel the Default Kernel
+
+After installing the CachyOS kernel, Fedora may still boot another kernel by default.  
+You can use `grubby` to check and change the default kernel entry.
+
+```bash
+# List all installed kernel entries
+sudo grubby --info=ALL | grep -E "^kernel|^index|^title"
+
+# Check the current default kernel
+sudo grubby --default-kernel
+sudo grubby --default-index
+
+# Find the entry that corresponds to the CachyOS kernel, then set it as default:
+
+sudo grubby --set-default-index=<INDEX_NUMBER>
+
+# Example:
+
+sudo grubby --set-default-index=0
+
+# Reboot and verify:
+
+uname -r
+
+# The output should contain cachyos if the CachyOS kernel is currently running.
 ```
 
 **More Info:** [CachyOS Kernel Installation](https://copr.fedorainfracloud.org/coprs/bieszczaders/kernel-cachyos/)
@@ -769,6 +797,15 @@ sudo reboot
 #### 1. Environment Variables for Wayland
 
 These environment variables optimize NVIDIA GPU behavior specifically for Wayland compositors. Unlike X11, Wayland handles many optimizations automatically, but these variables fine-tune performance.
+
+> **Important NVIDIA Wayland Warning**
+>
+> Do not blindly add all NVIDIA environment variables globally to `/etc/environment`.
+> On modern Fedora + RPM Fusion NVIDIA setups, many Wayland-related settings are already handled automatically.
+>
+> Global NVIDIA variables can break Wayland login, cause black screens, stuttering, or input lag depending on GPU generation, driver version, and desktop environment.
+>
+> Prefer testing these options per-game first, for example in Steam launch options.
 
 Add to `/etc/environment`:
 
@@ -2554,4 +2591,4 @@ This guide modifies system settings that may affect stability and security. Alwa
 
 -----
 
-*Last updated: May 2026*
+*Last updated: June 2026*
