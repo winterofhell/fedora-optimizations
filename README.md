@@ -904,7 +904,7 @@ gsettings set org.gnome.desktop.interface enable-animations false
 
 # Set scaling factor for high-DPI displays (adjust as needed)
 gsettings set org.gnome.desktop.interface scaling-factor 1
-```
+
 
 #### 4. KDE Plasma Wayland Configuration
 
