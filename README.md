@@ -903,6 +903,7 @@ gsettings set org.gnome.shell.extensions.dash-to-dock click-action 'cycle-window
 gsettings set org.gnome.desktop.interface enable-animations false
 
 # Set scaling factor for high-DPI displays (adjust as needed)
+```bash
 gsettings set org.gnome.desktop.interface scaling-factor 1
 ```
 
