@@ -899,9 +899,10 @@ gsettings set org.gnome.mutter experimental-features "['variable-refresh-rate']"
 > **Fedora 44 note:** With GNOME 50, VRR is no longer experimental. You can enable it directly in **Settings → Displays → Variable Refresh Rate** without any gsettings command. The command above still works but is no longer required.
 
 # Configure GNOME for gaming performance
+```bash
 gsettings set org.gnome.shell.extensions.dash-to-dock click-action 'cycle-windows'
 gsettings set org.gnome.desktop.interface enable-animations false
-
+```
 # Set scaling factor for high-DPI displays (adjust as needed)
 gsettings set org.gnome.desktop.interface scaling-factor 1
 ```
