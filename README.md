@@ -349,7 +349,9 @@ Modern Linux systems use udev rules to configure I/O schedulers per device type.
 
 **Create udev rule for optimal I/O scheduling:**
 ```bash
-sudo tee /etc/udev/rules.d/60-ioschedulers.rules
+sudo nano /etc/udev/rules.d/60-ioschedulers.rules
+```
+```
 # HDD (rotational drives) - use mq-deadline for better performance
 ACTION=="add|change", KERNEL=="sd[a-z]*", ATTR{queue/rotational}=="1", ATTR{queue/scheduler}="mq-deadline"
 
@@ -359,9 +361,9 @@ ACTION=="add|change", KERNEL=="sd[a-z]*|mmcblk[0-9]*", ATTR{queue/rotational}=="
 # NVMe SSD - use 'none' for best performance
 # NVMe drives have their own advanced queue management and don't benefit from additional scheduling
 ACTION=="add|change", KERNEL=="nvme[0-9]*", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="none"
+```
 
 thanks to netarchy for mentioning this new method!
-```
 
 **Apply the changes immediately:**
 ```bash
@@ -552,8 +554,11 @@ sudo systemctl enable --now tlp
 # Configure TLP for gaming/performance mode
 
 sudo nano /etc/tlp.conf
+```
 
-# Set: TLP_DEFAULT_MODE=performance (when plugged in)
+```ini
+# Sets the power profile to performance when plugged in
+TLP_DEFAULT_MODE=performance
 ```
 
 ### Advanced Memory Management
@@ -634,6 +639,9 @@ sudo dnf install rocm-opencl rocm-smi
 # Check performance and stability of games after making any changes
 
 sudo nano /etc/environment.d/99-amd-gaming.conf
+```
+
+```ini
 # Enable GPU Threading (its a really good option for minecraft, but may lower your fps in most of games)
 mesa_glthread=true
 
@@ -658,6 +666,9 @@ echo "high" | sudo tee /sys/class/drm/card*/device/power_profile
 
 # Create persistent service
 sudo nano /etc/systemd/system/amd-gpu-performance.service
+```
+Paste this in nano:
+```ini
 [Unit]
 Description=AMD GPU Performance Mode
 After=multi-user.target
@@ -671,7 +682,10 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 
+```
 
+Run:
+```bash
 sudo systemctl enable --now amd-gpu-performance.service
 ```
 
@@ -680,7 +694,7 @@ sudo systemctl enable --now amd-gpu-performance.service
 Allows the game to talk directly to the GPU, bypassing kernel overhead
 Or you can simply add it to the game launch options in Steam
 
-```bash
+```ini
 AMD_USERQ=1
 ```
 
@@ -981,6 +995,9 @@ sudo dnf install gamemode
 
 # Configure GameMode for NVIDIA optimization
 sudo nano /etc/gamemode.ini
+```
+Paste this in nano:
+```ini
 [general]
 renice=10
 ioprio=0
@@ -1028,6 +1045,10 @@ sudo dnf install nvtop mangohud goverlay
 
 # Create monitoring script for gaming sessions
 sudo nano /usr/local/bin/nvidia-monitor.sh
+
+```
+Paste this in nano:
+```bash
 #!/bin/bash
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
 echo "Driver: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader)"
@@ -1050,6 +1071,9 @@ echo 'options nvidia NVreg_DynamicPowerManagement=0x02' | sudo tee -a /etc/modpr
 
 # Enable runtime power management for laptops
 sudo nano /etc/udev/rules.d/80-nvidia-pm.rules
+```
+Paste this in nano:
+```ts
 # Enable runtime PM for NVIDIA VGA/3D controller devices
 SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", TEST=="power/control", ATTR{power/control}="auto"
 SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", TEST=="power/control", ATTR{power/control}="auto"
