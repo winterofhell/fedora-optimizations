@@ -224,6 +224,16 @@ The CachyOS team ships packages that apply many tweaks for you. Simpler and safe
 sudo dnf install cachyos-settings cachyos-ksm-settings scx-scheds scx-tools
 ```
 
+**Fedora 45:** if you get a file conflict with `systemd-oomd-defaults`, use one of these:
+```bash
+sudo dnf swap systemd-oomd-defaults cachyos-settings --allowerasing
+```
+or
+```bash
+sudo dnf remove systemd-oomd-defaults
+sudo dnf install cachyos-settings cachyos-ksm-settings scx-scheds scx-tools
+```
+
 `scx-tools` is required: it contains `scx_loader` and `scxctl`.
 
 ### SCX CPU Scheduler (scx_lavd)
